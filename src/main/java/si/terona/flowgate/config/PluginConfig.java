@@ -7,6 +7,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Typed, immutable wrapper around the raw BungeeCord {@link Configuration}.
@@ -30,6 +32,8 @@ public final class PluginConfig {
     private final boolean stickySessionEnabled;
     private final long stickySessionTtlMs;
     private final Map<String, Integer> serverWeights;
+    private final Set<String> pluginMessageAllowedConnectServers;
+    private final Set<String> pluginMessageAllowedSourceServers;
 
     public PluginConfig(Configuration cfg) {
         List<String> hubs = cfg.getStringList("hubs");
@@ -53,13 +57,18 @@ public final class PluginConfig {
         this.stickySessionTtlMs   = clampL(cfg.getLong("routing.sticky-session-ttl-ms", 300_000L), 10_000L, 3_600_000L);
 
         Map<String, Integer> weights = new HashMap<>();
-        if (cfg.contains("server-weights")) {
+        if (cfg.get("server-weights") instanceof Configuration) {
             for (String server : cfg.getSection("server-weights").getKeys()) {
                 int w = cfg.getInt("server-weights." + server, 1);
                 weights.put(server.toLowerCase(), clamp(w, 1, 1000));
             }
         }
         this.serverWeights = Collections.unmodifiableMap(weights);
+
+        this.pluginMessageAllowedConnectServers = readLowerCaseSet(
+                cfg.getStringList("plugin-messages.allowed-connect-servers"));
+        this.pluginMessageAllowedSourceServers = readLowerCaseSet(
+                cfg.getStringList("plugin-messages.allowed-source-servers"));
     }
 
     public int getServerWeight(String serverName) {
@@ -68,6 +77,14 @@ public final class PluginConfig {
 
     private static int clamp(int v, int min, int max) { return Math.max(min, Math.min(max, v)); }
     private static long clampL(long v, long min, long max) { return Math.max(min, Math.min(max, v)); }
+
+    private static Set<String> readLowerCaseSet(List<String> values) {
+        Set<String> result = new HashSet<>();
+        for (String value : values) {
+            if (value != null && !value.trim().isEmpty()) result.add(value.toLowerCase());
+        }
+        return Collections.unmodifiableSet(result);
+    }
 
     public List<String> getHubServers()        { return hubServers; }
     public String getFallbackServer()          { return fallbackServer; }
@@ -85,4 +102,6 @@ public final class PluginConfig {
     public boolean isStickySessionEnabled()    { return stickySessionEnabled; }
     public long getStickySessionTtlMs()        { return stickySessionTtlMs; }
     public Map<String, Integer> getServerWeights() { return serverWeights; }
+    public Set<String> getPluginMessageAllowedConnectServers() { return pluginMessageAllowedConnectServers; }
+    public Set<String> getPluginMessageAllowedSourceServers() { return pluginMessageAllowedSourceServers; }
 }

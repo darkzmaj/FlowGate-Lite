@@ -46,6 +46,7 @@ public final class PluginMessageListener implements Listener {
         if (!(event.getReceiver() instanceof ProxiedPlayer)) return;
 
         ProxiedPlayer player = (ProxiedPlayer) event.getReceiver();
+        Server source = (Server) event.getSender();
 
         ByteArrayDataInput in = ByteStreams.newDataInput(event.getData());
         String subchannel;
@@ -69,14 +70,27 @@ public final class PluginMessageListener implements Listener {
         }
 
         ServerInfo target = plugin.getProxy().getServerInfo(targetServerName);
-        if (target == null) {
-            plugin.debug("Plugin message blocked: unknown server '" + targetServerName + "'");
+        if (target == null || !plugin.getRouterService().isPluginMessageDestinationAllowed(targetServerName)) {
+            plugin.debug("Plugin message blocked: disallowed destination '" + targetServerName + "'");
+            event.setCancelled(true);
+            return;
+        }
+
+        if (!plugin.getRouterService().isPluginMessageSourceAllowed(source.getInfo().getName())) {
+            plugin.debug("Plugin message blocked: disallowed source '" + source.getInfo().getName() + "'");
             event.setCancelled(true);
             return;
         }
 
         if (isRateLimited(player.getUniqueId())) {
             plugin.debug("Plugin message rate-limited for: " + player.getName());
+            event.setCancelled(true);
+            return;
+        }
+
+        if (plugin.getRouterService().isHub(targetServerName)
+                && !plugin.getRouterService().reserveHub(player, targetServerName)) {
+            plugin.debug("Plugin message blocked: hub unavailable or full '" + targetServerName + "'");
             event.setCancelled(true);
             return;
         }
@@ -101,5 +115,10 @@ public final class PluginMessageListener implements Listener {
 
         int count = rateCounts.computeIfAbsent(playerId, k -> new AtomicInteger(0)).incrementAndGet();
         return count > RATE_LIMIT_PER_SECOND;
+    }
+
+    public void removeRateLimit(UUID playerId) {
+        rateCounts.remove(playerId);
+        rateWindows.remove(playerId);
     }
 }

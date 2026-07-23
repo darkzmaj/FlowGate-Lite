@@ -90,6 +90,9 @@ public final class ConfigValidator {
 
         // Slash servers: validate referenced servers exist
         if (config.contains("slash-servers")) {
+            if (!(config.get("slash-servers") instanceof Configuration)) {
+                errors.add("'slash-servers' must be a section");
+            } else {
             for (String cmd : config.getSection("slash-servers").getKeys()) {
                 String target = config.getString("slash-servers." + cmd, "");
                 if (target.isEmpty()) {
@@ -99,7 +102,14 @@ public final class ConfigValidator {
                             + "' is not registered in the proxy config (will be skipped)");
                 }
             }
+            }
         }
+
+        if (config.contains("server-weights") && !(config.get("server-weights") instanceof Configuration)) {
+            errors.add("'server-weights' must be a section");
+        }
+        validateStringList(config, "plugin-messages.allowed-connect-servers", errors);
+        validateStringList(config, "plugin-messages.allowed-source-servers", errors);
 
         return errors;
     }
@@ -107,6 +117,12 @@ public final class ConfigValidator {
     private static void validateBoolean(Configuration config, String key, List<String> errors) {
         if (config.contains(key) && !(config.get(key) instanceof Boolean)) {
             errors.add("'" + key + "' must be true or false, got: " + config.get(key));
+        }
+    }
+
+    private static void validateStringList(Configuration config, String key, List<String> errors) {
+        if (config.contains(key) && !(config.get(key) instanceof List)) {
+            errors.add("'" + key + "' must be a list of server names");
         }
     }
 }

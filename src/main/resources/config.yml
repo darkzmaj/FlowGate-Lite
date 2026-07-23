@@ -68,6 +68,13 @@ slash-servers:
   anarchy: anarchy-server
   dev: dev-server
 
+# Policy for backend BungeeCord Connect plugin messages.
+# Empty destination list permits only configured hubs and the fallback server.
+# Empty source list permits messages from any backend registered on this proxy.
+plugin-messages:
+  allowed-connect-servers: []
+  allowed-source-servers: []
+
 # Human-readable display names used in messages (does not affect routing)
 server-names:
   servername1: Hub 1

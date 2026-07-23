@@ -99,6 +99,18 @@ public final class RouterService {
         return result;
     }
 
+    public synchronized boolean reserveHub(ProxiedPlayer player, String serverName) {
+        purgeExpiredReservations();
+        if (!isHub(serverName) || !healthMonitor.isHealthy(serverName)) return false;
+
+        ServerInfo info = ProxyServer.getInstance().getServerInfo(serverName);
+        int limit = Math.max(1, config.getHardPlayerLimit() - config.getReservedSlots());
+        if (info == null || getEffectivePlayerCount(info) >= limit) return false;
+
+        reservations.put(player.getUniqueId(), new Reservation(info.getName(), System.currentTimeMillis()));
+        return true;
+    }
+
     public synchronized void releaseReservation(UUID playerId) {
         reservations.remove(playerId);
     }
@@ -175,6 +187,19 @@ public final class RouterService {
 
     public boolean isFallback(String serverName) {
         return serverName != null && config.getFallbackServer().equalsIgnoreCase(serverName);
+    }
+
+    public boolean isPluginMessageDestinationAllowed(String serverName) {
+        if (serverName == null) return false;
+        if (config.getPluginMessageAllowedConnectServers().isEmpty()) {
+            return isHub(serverName) || isFallback(serverName);
+        }
+        return config.getPluginMessageAllowedConnectServers().contains(serverName.toLowerCase());
+    }
+
+    public boolean isPluginMessageSourceAllowed(String serverName) {
+        return serverName != null && (config.getPluginMessageAllowedSourceServers().isEmpty()
+                || config.getPluginMessageAllowedSourceServers().contains(serverName.toLowerCase()));
     }
 
     private static String currentServerName(ProxiedPlayer player) {

@@ -57,6 +57,7 @@ public final class FlowGate extends Plugin {
     private HealthMonitorService healthMonitorService;
     private RouterService        routerService;
     private PlayerSessionService playerSessionService;
+    private PluginMessageListener pluginMessageListener;
 
     // Runtime
     private volatile boolean shuttingDown = false;
@@ -122,7 +123,8 @@ public final class FlowGate extends Plugin {
         getProxy().registerChannel("BungeeCord");
         getProxy().getPluginManager().registerListener(this, new FallbackListener(this));
         getProxy().getPluginManager().registerListener(this, new ServerConnectBlockerListener(this));
-        getProxy().getPluginManager().registerListener(this, new PluginMessageListener(this));
+        pluginMessageListener = new PluginMessageListener(this);
+        getProxy().getPluginManager().registerListener(this, pluginMessageListener);
         getProxy().getPluginManager().registerListener(this, new LimboRouterListener(this));
         getProxy().getPluginManager().registerListener(this, new MotdListener(this));
 
@@ -154,6 +156,7 @@ public final class FlowGate extends Plugin {
             playerSessionService = null;
         }
         searchingPlayers.clear();
+        pluginMessageListener = null;
         TitleManager.shutdown();
         getProxy().getPluginManager().unregisterListeners(this);
         getProxy().getPluginManager().unregisterCommands(this);
@@ -231,7 +234,11 @@ public final class FlowGate extends Plugin {
     // Reload
 
     public boolean reloadAll() {
+        Configuration previousConfig = config;
+        Configuration previousMessages = messages;
+        Configuration previousMotd = motd;
         if (!loadConfig() || !loadMessages() || !loadMotd()) {
+            restoreConfiguration(previousConfig, previousMessages, previousMotd);
             getLogger().severe("[FlowGate-Lite] Reload failed: cannot parse config files.");
             return false;
         }
@@ -239,6 +246,7 @@ public final class FlowGate extends Plugin {
         List<String> errors = ConfigValidator.validate(config, getProxy());
         for (String err : errors) {
             if (err.startsWith("'hubs'") || err.startsWith("'fallback'")) {
+                restoreConfiguration(previousConfig, previousMessages, previousMotd);
                 getLogger().severe("[FlowGate-Lite] Reload failed: " + err);
                 return false;
             }
@@ -246,6 +254,7 @@ public final class FlowGate extends Plugin {
         }
 
         if (!validateMessages() || !validateMotd()) {
+            restoreConfiguration(previousConfig, previousMessages, previousMotd);
             getLogger().severe("[FlowGate-Lite] Reload failed: invalid messages.yml or motd.yml.");
             return false;
         }
@@ -275,6 +284,8 @@ public final class FlowGate extends Plugin {
                     TitleManager.start(player);
                 }
             }
+        } else {
+            TitleManager.shutdown();
         }
 
         return true;
@@ -304,7 +315,7 @@ public final class FlowGate extends Plugin {
         for (Command cmd : registeredSlashCommands) getProxy().getPluginManager().unregisterCommand(cmd);
         registeredSlashCommands.clear();
         slashServers.clear();
-        if (!config.contains("slash-servers")) return;
+        if (!(config.get("slash-servers") instanceof Configuration)) return;
 
         for (String cmdName : config.getSection("slash-servers").getKeys()) {
             String target = config.getString("slash-servers." + cmdName);
@@ -403,14 +414,30 @@ public final class FlowGate extends Plugin {
             if (in == null) return;
             Configuration defaults = ConfigurationProvider.getProvider(YamlConfiguration.class).load(in);
             boolean changed = false;
-            for (String key : defaults.getKeys()) {
-                if (!target.contains(key)) {
-                    target.set(key, defaults.get(key));
-                    changed = true;
-                }
-            }
+            changed = mergeMissingDefaults(target, defaults);
             if (changed) ConfigurationProvider.getProvider(YamlConfiguration.class).save(target, file);
         }
+    }
+
+    private static boolean mergeMissingDefaults(Configuration target, Configuration defaults) {
+        boolean changed = false;
+        for (String key : defaults.getKeys()) {
+            Object defaultValue = defaults.get(key);
+            Object currentValue = target.get(key);
+            if (currentValue == null) {
+                target.set(key, defaultValue);
+                changed = true;
+            } else if (defaultValue instanceof Configuration && currentValue instanceof Configuration) {
+                changed |= mergeMissingDefaults((Configuration) currentValue, (Configuration) defaultValue);
+            }
+        }
+        return changed;
+    }
+
+    private void restoreConfiguration(Configuration previousConfig, Configuration previousMessages, Configuration previousMotd) {
+        config = previousConfig;
+        messages = previousMessages;
+        motd = previousMotd;
     }
 
     // Validation
@@ -470,6 +497,10 @@ public final class FlowGate extends Plugin {
     }
 
     public boolean isShuttingDown() { return shuttingDown; }
+
+    public void clearPluginMessageRateLimit(UUID playerId) {
+        if (pluginMessageListener != null) pluginMessageListener.removeRateLimit(playerId);
+    }
 
     // Getters
 

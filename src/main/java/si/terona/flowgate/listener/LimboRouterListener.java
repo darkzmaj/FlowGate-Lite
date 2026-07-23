@@ -48,6 +48,7 @@ public final class LimboRouterListener implements Listener {
         UUID uuid = player.getUniqueId();
         plugin.getSearchingPlayers().remove(uuid);
         plugin.getRouterService().releaseReservation(uuid);
+        plugin.clearPluginMessageRateLimit(uuid);
         plugin.getPlayerSessionService().remove(uuid);
         TitleManager.clear(player);
     }

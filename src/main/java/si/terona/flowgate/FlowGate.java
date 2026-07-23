@@ -195,7 +195,7 @@ public final class FlowGate extends Plugin {
             PlayerSession session = playerSessionService.getOrCreate(player);
             if (!session.tryTransition(ConnectionState.LIMBO, ConnectionState.ROUTING)) continue;
 
-            RoutingResult result = routerService.findBestHub(player, session);
+            RoutingResult result = routerService.reserveBestHub(player, session);
             if (!result.isSuccess()) {
                 session.setState(ConnectionState.LIMBO);
                 metricsService.recordRoutingFailure(result.getReason());
@@ -204,6 +204,7 @@ public final class FlowGate extends Plugin {
 
             ServerInfo target = getProxy().getServerInfo(result.getServerName());
             if (target == null) {
+                routerService.releaseReservation(uuid);
                 session.setState(ConnectionState.LIMBO);
                 continue;
             }
@@ -212,6 +213,7 @@ public final class FlowGate extends Plugin {
             sendMessage(player, "routing.found");
 
             player.connect(target, (success, error) -> {
+                routerService.releaseReservation(uuid);
                 if (success) {
                     searchingPlayers.remove(uuid);
                     playerSessionService.markConnected(uuid, result.getServerName());
@@ -248,15 +250,11 @@ public final class FlowGate extends Plugin {
             return false;
         }
 
-        pluginConfig = new PluginConfig(config);
-
-        if (healthMonitorService != null) healthMonitorService.shutdown();
-        metricsService       = new MetricsService();
-        healthMonitorService = new HealthMonitorService(getLogger(), pluginConfig, metricsService);
-        routerService        = new RouterService(healthMonitorService, pluginConfig);
-        playerSessionService = new PlayerSessionService(pluginConfig);
-
-        healthMonitorService.start();
+        PluginConfig reloadedConfig = new PluginConfig(config);
+        pluginConfig = reloadedConfig;
+        routerService.reload(reloadedConfig);
+        playerSessionService.reload(reloadedConfig);
+        healthMonitorService.reload(reloadedConfig);
 
         getProxy().getPluginManager().unregisterCommands(this);
         registeredSlashCommands.clear();
@@ -486,4 +484,3 @@ public final class FlowGate extends Plugin {
     public Configuration        getMessages()              { return messages; }
     public Configuration        getMotd()                  { return motd; }
 }
-

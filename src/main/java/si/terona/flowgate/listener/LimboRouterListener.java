@@ -24,6 +24,7 @@ public final class LimboRouterListener implements Listener {
     public void onServerConnected(ServerConnectedEvent event) {
         ProxiedPlayer player = event.getPlayer();
         if (player == null) return;
+        plugin.getRouterService().releaseReservation(player.getUniqueId());
         if (!plugin.isOnFallback(player)) return;
 
         UUID uuid = player.getUniqueId();
@@ -46,6 +47,7 @@ public final class LimboRouterListener implements Listener {
 
         UUID uuid = player.getUniqueId();
         plugin.getSearchingPlayers().remove(uuid);
+        plugin.getRouterService().releaseReservation(uuid);
         plugin.getPlayerSessionService().remove(uuid);
         TitleManager.clear(player);
     }

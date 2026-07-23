@@ -9,6 +9,7 @@ import net.md_5.bungee.api.connection.ProxiedPlayer;
 import net.md_5.bungee.api.plugin.Command;
 import si.terona.flowgate.FlowGate;
 import si.terona.flowgate.model.RoutingResult;
+import si.terona.flowgate.model.PlayerSession;
 
 /**
  * Hub command – sends the player to the best available hub server.
@@ -30,7 +31,8 @@ public final class HubCommand extends Command {
         if (!player.isConnected()) return;
 
         // Find best hub using cached health – no pings
-        RoutingResult result = plugin.getRouterService().findBestHub(player);
+        PlayerSession session = plugin.getPlayerSessionService().getOrCreate(player);
+        RoutingResult result = plugin.getRouterService().reserveBestHub(player, session);
 
         if (!result.isSuccess()) {
             // All hubs unavailable – try limbo as last resort
@@ -55,6 +57,7 @@ public final class HubCommand extends Command {
 
         ServerInfo hub = plugin.getProxy().getServerInfo(result.getServerName());
         if (hub == null) {
+            plugin.getRouterService().releaseReservation(player.getUniqueId());
             plugin.getMetricsService().recordRoutingFailure("hub not found in proxy");
             return;
         }
@@ -68,7 +71,9 @@ public final class HubCommand extends Command {
         }
 
         player.connect(hub, (success, error) -> {
+            plugin.getRouterService().releaseReservation(player.getUniqueId());
             if (success) {
+                plugin.getPlayerSessionService().markConnected(player.getUniqueId(), hub.getName());
                 plugin.getMetricsService().recordRoutingSuccess(hub.getName());
                 plugin.debug("HubCommand: " + player.getName() + " → " + hub.getName());
             } else {

@@ -8,10 +8,18 @@ import si.terona.flowgate.model.PlayerSession;
 import si.terona.flowgate.model.RoutingResult;
 import si.terona.flowgate.model.ServerHealth;
 
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.UUID;
+
 public final class RouterService {
 
     private final HealthMonitorService healthMonitor;
-    private final PluginConfig config;
+    private volatile PluginConfig config;
+    private final Map<UUID, Reservation> reservations = new HashMap<>();
+
+    private static final long RESERVATION_TIMEOUT_MS = 15_000L;
 
     public RouterService(HealthMonitorService healthMonitor, PluginConfig config) {
         this.healthMonitor = healthMonitor;
@@ -25,6 +33,7 @@ public final class RouterService {
     }
 
     public RoutingResult findBestHub(ProxiedPlayer player, PlayerSession session) {
+        purgeExpiredReservations();
         if (!config.isRoutingEnabled()) {
             return RoutingResult.failure("Routing is disabled");
         }
@@ -41,7 +50,7 @@ public final class RouterService {
                     ServerHealth health = healthMonitor.getHealth(sticky);
                     if (health != null && health.isAvailable()) {
                         ServerInfo info = ProxyServer.getInstance().getServerInfo(sticky);
-                        if (info != null && info.getPlayers().size() < limit) {
+                        if (info != null && getEffectivePlayerCount(info) < limit) {
                             return RoutingResult.success(sticky);
                         }
                     }
@@ -62,7 +71,7 @@ public final class RouterService {
             ServerInfo info = ProxyServer.getInstance().getServerInfo(hubName);
             if (info == null) continue;
 
-            int count = info.getPlayers().size();
+            int count = getEffectivePlayerCount(info);
             if (count >= limit) continue;
 
             // Lower score = preferred. Weight divides the load, so heavier servers score lower.
@@ -78,6 +87,26 @@ public final class RouterService {
                 : RoutingResult.failure("No available hubs (all offline, quarantined, or full)");
     }
 
+    /**
+     * Selects and reserves a hub slot for a pending connection. The reservation is
+     * released when the player connects, disconnects, or the connection fails.
+     */
+    public synchronized RoutingResult reserveBestHub(ProxiedPlayer player, PlayerSession session) {
+        RoutingResult result = findBestHub(player, session);
+        if (result.isSuccess()) {
+            reservations.put(player.getUniqueId(), new Reservation(result.getServerName(), System.currentTimeMillis()));
+        }
+        return result;
+    }
+
+    public synchronized void releaseReservation(UUID playerId) {
+        reservations.remove(playerId);
+    }
+
+    public void reload(PluginConfig config) {
+        this.config = config;
+    }
+
     public RoutingResult findFallback(ProxiedPlayer player, String failedServer) {
         if (!config.isFallbackEnabled()) {
             return RoutingResult.failure("Fallback is disabled");
@@ -85,7 +114,8 @@ public final class RouterService {
 
         String current = currentServerName(player);
         ServerInfo best = null;
-        int lowest = Integer.MAX_VALUE;
+        double bestScore = Double.MAX_VALUE;
+        int limit = Math.max(1, config.getHardPlayerLimit() - config.getReservedSlots());
 
         for (String hubName : config.getHubServers()) {
             if (hubName.equalsIgnoreCase(current)) continue;
@@ -97,11 +127,12 @@ public final class RouterService {
             ServerInfo info = ProxyServer.getInstance().getServerInfo(hubName);
             if (info == null) continue;
 
-            int count = info.getPlayers().size();
-            if (count >= config.getHardPlayerLimit()) continue;
+            int count = getEffectivePlayerCount(info);
+            if (count >= limit) continue;
 
-            if (count < lowest) {
-                lowest = count;
+            double score = (double) count / config.getServerWeight(hubName);
+            if (score < bestScore) {
+                bestScore = score;
                 best = info;
             }
         }
@@ -148,5 +179,31 @@ public final class RouterService {
 
     private static String currentServerName(ProxiedPlayer player) {
         return player.getServer() != null ? player.getServer().getInfo().getName() : null;
+    }
+
+    private synchronized int getEffectivePlayerCount(ServerInfo info) {
+        int pending = 0;
+        for (Reservation reservation : reservations.values()) {
+            if (reservation.serverName.equalsIgnoreCase(info.getName())) pending++;
+        }
+        return info.getPlayers().size() + pending;
+    }
+
+    private synchronized void purgeExpiredReservations() {
+        long cutoff = System.currentTimeMillis() - RESERVATION_TIMEOUT_MS;
+        Iterator<Map.Entry<UUID, Reservation>> iterator = reservations.entrySet().iterator();
+        while (iterator.hasNext()) {
+            if (iterator.next().getValue().createdAt < cutoff) iterator.remove();
+        }
+    }
+
+    private static final class Reservation {
+        private final String serverName;
+        private final long createdAt;
+
+        private Reservation(String serverName, long createdAt) {
+            this.serverName = serverName;
+            this.createdAt = createdAt;
+        }
     }
 }

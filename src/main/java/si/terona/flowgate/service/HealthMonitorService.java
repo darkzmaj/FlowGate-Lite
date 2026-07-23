@@ -9,6 +9,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
 
 import net.md_5.bungee.api.ProxyServer;
@@ -19,13 +20,14 @@ import si.terona.flowgate.model.ServerHealth;
 public final class HealthMonitorService {
 
     private final Logger logger;
-    private final PluginConfig config;
+    private volatile PluginConfig config;
     private final MetricsService metrics;
 
     private final ConcurrentHashMap<String, ServerHealth> healthCache = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, AtomicInteger> failureCounters = new ConcurrentHashMap<>();
 
     private ScheduledExecutorService scheduler;
+    private final AtomicLong generation = new AtomicLong(0L);
 
     public HealthMonitorService(Logger logger, PluginConfig config, MetricsService metrics) {
         this.logger  = logger;
@@ -45,10 +47,11 @@ public final class HealthMonitorService {
             return t;
         });
 
+        long currentGeneration = generation.incrementAndGet();
         int interval = config.getPingIntervalSeconds();
         // scheduleWithFixedDelay: next run only starts after current completes.
         // Prevents overlapping ping cycles during backend stalls.
-        scheduler.scheduleWithFixedDelay(this::runPingCycle, 0L, interval, TimeUnit.SECONDS);
+        scheduler.scheduleWithFixedDelay(() -> runPingCycle(currentGeneration), 0L, interval, TimeUnit.SECONDS);
 
         if (config.isDebugMode()) {
             logger.info("[FlowGate-Lite] HealthMonitorService started (interval=" + interval + "s)");
@@ -56,6 +59,7 @@ public final class HealthMonitorService {
     }
 
     public void shutdown() {
+        generation.incrementAndGet();
         if (scheduler != null && !scheduler.isShutdown()) {
             scheduler.shutdownNow();
             try {
@@ -68,9 +72,15 @@ public final class HealthMonitorService {
         failureCounters.clear();
     }
 
+    public void reload(PluginConfig config) {
+        shutdown();
+        this.config = config;
+        start();
+    }
+
     // Ping cycle
 
-    private void runPingCycle() {
+    private void runPingCycle(long cycleGeneration) {
         if (Thread.currentThread().isInterrupted()) return;
         try {
             Set<String> servers = new LinkedHashSet<>(config.getHubServers());
@@ -94,6 +104,7 @@ public final class HealthMonitorService {
                 final String name = serverName;
                 final long start = System.currentTimeMillis();
                 info.ping((result, error) -> {
+                    if (generation.get() != cycleGeneration) return;
                     if (error != null || result == null) {
                         handleFailure(name);
                     } else {

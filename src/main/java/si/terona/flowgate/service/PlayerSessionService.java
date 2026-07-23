@@ -11,7 +11,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class PlayerSessionService {
 
     private final ConcurrentHashMap<UUID, PlayerSession> sessions = new ConcurrentHashMap<>();
-    private final PluginConfig config;
+    private volatile PluginConfig config;
 
     public PlayerSessionService(PluginConfig config) {
         this.config = config;
@@ -52,6 +52,10 @@ public final class PlayerSessionService {
             session.incrementRetry();
             session.setLastRouteAttempt(System.currentTimeMillis());
         }
+    }
+
+    public void reload(PluginConfig config) {
+        this.config = config;
     }
 
     // Lifecycle

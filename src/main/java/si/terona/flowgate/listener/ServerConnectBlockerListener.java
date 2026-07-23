@@ -29,7 +29,8 @@ public final class ServerConnectBlockerListener implements Listener {
         if (player == null || event.getTarget() == null) return;
 
         if (plugin.getRouterService().isAnyHubAvailable()) {
-            RoutingResult result = plugin.getRouterService().findBestHub(player);
+            RoutingResult result = plugin.getRouterService().reserveBestHub(
+                    player, plugin.getPlayerSessionService().getOrCreate(player));
             if (result.isSuccess()) {
                 ServerInfo hub = plugin.getProxy().getServerInfo(result.getServerName());
                 if (hub != null && !hub.getName().equalsIgnoreCase(event.getTarget().getName())) {

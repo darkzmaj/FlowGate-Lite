@@ -73,7 +73,7 @@ On disable, the plugin cancels the limbo task, shuts down the health monitor exe
 
 ## Installation
 
-1. Drop `FlowGate-Lite-1.0.5.jar` into your proxy's `plugins/` directory.
+1. Drop `FlowGate-Lite-2.0.0.jar` into your proxy's `plugins/` directory.
 2. Restart the proxy. Config files are generated automatically.
 3. Edit `plugins/FlowGate-Lite/config.yml` with your server names.
 4. Edit `plugins/FlowGate-Lite/messages.yml` and `motd.yml` as needed.

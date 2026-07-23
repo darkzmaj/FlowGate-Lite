@@ -135,7 +135,7 @@ public final class FlowGate extends Plugin {
         healthMonitorService.start();
         startFallbackScheduler();
 
-        getLogger().info("[FlowGate-Lite] v1.0.5 enabled.");
+        getLogger().info("[FlowGate-Lite] v2.0.0 enabled.");
         return true;
     }
 

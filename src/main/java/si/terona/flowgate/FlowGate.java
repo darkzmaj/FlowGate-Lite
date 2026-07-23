@@ -95,7 +95,7 @@ public final class FlowGate extends Plugin {
         List<String> errors = ConfigValidator.validate(config, getProxy());
         boolean fatal = false;
         for (String err : errors) {
-            if (err.startsWith("'hubs'") || err.startsWith("'fallback'")) {
+            if (isFatalConfigError(err)) {
                 getLogger().severe("[FlowGate-Lite] Config error: " + err);
                 fatal = true;
             } else {
@@ -243,7 +243,7 @@ public final class FlowGate extends Plugin {
 
         List<String> errors = ConfigValidator.validate(config, getProxy());
         for (String err : errors) {
-            if (err.startsWith("'hubs'") || err.startsWith("'fallback'")) {
+            if (isFatalConfigError(err)) {
                 restoreConfiguration(previousConfig, previousMessages, previousMotd);
                 getLogger().severe("[FlowGate-Lite] Reload failed: " + err);
                 return false;
@@ -436,6 +436,10 @@ public final class FlowGate extends Plugin {
         config = previousConfig;
         messages = previousMessages;
         motd = previousMotd;
+    }
+
+    private static boolean isFatalConfigError(String error) {
+        return !error.endsWith("(will be skipped)");
     }
 
     // Validation

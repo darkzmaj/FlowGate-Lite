@@ -38,14 +38,16 @@ public final class ConfigValidator {
         }
 
         // Fallback server
-        if (!config.contains("fallback.fallback-server")) {
-            errors.add("'fallback.fallback-server' is missing");
-        } else {
-            String fallback = config.getString("fallback.fallback-server", "");
-            if (fallback.isEmpty()) {
-                errors.add("'fallback.fallback-server' must not be empty");
-            } else if (proxy.getServerInfo(fallback) == null) {
-                errors.add("Fallback server '" + fallback + "' is not registered in the proxy config");
+        if (config.getBoolean("fallback.enabled", true)) {
+            if (!config.contains("fallback.fallback-server")) {
+                errors.add("'fallback.fallback-server' is missing");
+            } else {
+                String fallback = config.getString("fallback.fallback-server", "");
+                if (fallback.isEmpty()) {
+                    errors.add("'fallback.fallback-server' must not be empty");
+                } else if (proxy.getServerInfo(fallback) == null) {
+                    errors.add("Fallback server '" + fallback + "' is not registered in the proxy config");
+                }
             }
         }
 

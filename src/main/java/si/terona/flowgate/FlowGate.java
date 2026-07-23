@@ -146,14 +146,12 @@ public final class FlowGate extends Plugin {
         }
         if (healthMonitorService != null) {
             healthMonitorService.shutdown();
-            healthMonitorService = null;
         }
         if (metricsService != null && pluginConfig != null && pluginConfig.isDebugMode()) {
             getLogger().info("[FlowGate-Lite] " + metricsService.getSummary());
         }
         if (playerSessionService != null) {
             playerSessionService.clearAll();
-            playerSessionService = null;
         }
         searchingPlayers.clear();
         pluginMessageListener = null;

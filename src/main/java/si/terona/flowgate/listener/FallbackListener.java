@@ -31,7 +31,7 @@ public final class FallbackListener implements Listener {
         if (plugin.isOnFallback(player)) return;
 
         String kickedFrom = event.getKickedFrom() != null ? event.getKickedFrom().getName() : null;
-        RoutingResult result = plugin.getRouterService().findFallback(player, kickedFrom);
+        RoutingResult result = plugin.getRouterService().reserveFallback(player, kickedFrom);
 
         if (!result.isSuccess()) {
             plugin.debug("Fallback failed for " + player.getName() + ": " + result.getReason());

@@ -152,6 +152,16 @@ public final class RouterService {
         return best != null ? RoutingResult.success(best.getName()) : routeToLimbo(player);
     }
 
+    /** Selects a failover target and reserves capacity when it is a hub. */
+    public synchronized RoutingResult reserveFallback(ProxiedPlayer player, String failedServer) {
+        RoutingResult result = findFallback(player, failedServer);
+        if (result.isSuccess() && isHub(result.getServerName())) {
+            reservations.put(player.getUniqueId(),
+                    new Reservation(result.getServerName(), System.currentTimeMillis()));
+        }
+        return result;
+    }
+
     public RoutingResult routeToLimbo(ProxiedPlayer player) {
         String name = config.getFallbackServer();
         if (name == null || name.isEmpty()) {

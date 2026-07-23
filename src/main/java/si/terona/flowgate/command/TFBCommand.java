@@ -54,7 +54,7 @@ public final class TFBCommand extends Command {
     }
 
     private void sendStatus(CommandSender sender) {
-        msg(sender, "&b[FlowGate-Lite] &fv2.0.0 Status");
+        msg(sender, "&b[FlowGate-Lite] &fv1.0.6 Status");
 
         Map<String, ServerHealth> health = plugin.getHealthMonitorService().getAllHealth();
         if (health.isEmpty()) {

@@ -3,7 +3,7 @@ plugins {
 }
 
 group = 'si.terona'
-version = '2.0.0'
+version = '1.0.6'
 
 java {
     sourceCompatibility = JavaVersion.VERSION_17

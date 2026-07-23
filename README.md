@@ -38,7 +38,7 @@ Players who cannot be routed (all hubs offline or full) are held in a configurab
 
 ### Health Monitor
 
-A single-threaded `ScheduledExecutorService` drives the ping cycle using `scheduleWithFixedDelay` (not `scheduleAtFixedRate`). This prevents overlapping ping cycles under backend hangs or network stalls — each cycle only starts after the previous one completes.
+A single-threaded `ScheduledExecutorService` drives the ping cycle using `scheduleWithFixedDelay`. A per-server in-flight guard prevents a slow backend ping from being duplicated; stale callbacks from a reload are ignored.
 
 Ping results update an immutable `ServerHealth` snapshot stored in a `ConcurrentHashMap`. All routing reads from this cache. No routing code performs live pings.
 
@@ -151,7 +151,7 @@ slash-servers:
 | Command | Permission | Description |
 |---------|-----------|-------------|
 | `/flowgate reload` | `flowgate.command.reload` | Reloads configs and restarts services |
-| `/flowgate status` | `flowgate.command.reload` | Shows backend health and metrics |
+| `/flowgate status` | `flowgate.command.status` or `flowgate.command.reload` | Shows backend health and metrics |
 | `/hub` (configurable) | — | Sends player to best available hub |
 | `/<slash-server>` | — | Sends player to a specific named server |
 
@@ -169,9 +169,17 @@ slash-servers:
 
 ## Sticky Sessions
 
-When `routing.sticky-sessions: true`, the router remembers the last hub a player successfully connected to. On their next routing decision, if that hub is still healthy and has capacity, they are sent there directly. The session expires after `sticky-session-ttl-ms` milliseconds.
+When `routing.sticky-sessions: true`, the router remembers the last hub a player successfully connected to during the current proxy session. On a later routing decision in that session, if that hub is still healthy and has capacity, it is selected directly. The session expires after `sticky-session-ttl-ms` milliseconds.
 
-Useful for networks where game state is hub-local and players should return to the same hub after a disconnect or reroute.
+Useful for networks where game state is hub-local and players should return to the same hub after a reroute.
+
+Sticky assignments are intentionally not persisted across proxy reconnects. This keeps FlowGate-Lite stateless and avoids a storage dependency.
+
+---
+
+## Backend Plugin Messages
+
+Backend `BungeeCord:Connect` messages may target configured hubs and the fallback server by default. To allow other destinations or restrict which backend servers may issue them, configure `plugin-messages.allowed-connect-servers` and `plugin-messages.allowed-source-servers`.
 
 ---
 

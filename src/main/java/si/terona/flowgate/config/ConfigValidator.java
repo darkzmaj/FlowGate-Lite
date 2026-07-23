@@ -73,13 +73,6 @@ public final class ConfigValidator {
             }
         }
 
-        if (config.contains("players.hub-soft-limit")) {
-            int soft = config.getInt("players.hub-soft-limit", -1);
-            if (soft < 1) {
-                errors.add("'players.hub-soft-limit' must be >= 1, got: " + soft);
-            }
-        }
-
         // Hub command limit
         if (config.contains("hub-commands")) {
             int count = config.getStringList("hub-commands").size();

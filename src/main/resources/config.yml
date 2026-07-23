@@ -26,8 +26,6 @@ hub-commands:
 # Routing behaviour
 routing:
   enabled: true
-  # Maximum routing attempts per limbo player before cooldown resets
-  max-retries: 3
   # Minimum delay (ms) between successive routing attempts for one player
   retry-cooldown-ms: 5000
   # Consecutive ping failures before a hub is quarantined
@@ -48,8 +46,6 @@ fallback:
 players:
   # Hard cap: hub is excluded from routing at or above this player count
   hub-max-players: 100
-  # Soft cap: informational; reserved for future balancing hints
-  hub-soft-limit: 50
   # Slots reserved from routing (effective cap = hub-max-players - reserved-slots)
   reserved-slots: 5
 

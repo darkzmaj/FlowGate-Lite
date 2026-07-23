@@ -22,6 +22,7 @@ commands:
   usage: "&7Usage: &f/flowgate reload"
   reload: "&aAll files have been successfully reloaded! &7(Restart the proxy server if all changes are not applied)"
   unknown: "&cUnknown command. Did you mean &f/flowgate reload&c?"
+  no-permission: "&cYou do not have permission to use this command."
 
 # Fallback messages
 fallback:

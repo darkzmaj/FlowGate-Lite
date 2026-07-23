@@ -105,7 +105,6 @@ hub-commands:
 
 routing:
   enabled: true
-  max-retries: 3
   retry-cooldown-ms: 5000
   quarantine-threshold: 3
   quarantine-duration-ms: 60000
@@ -118,7 +117,6 @@ fallback:
 
 players:
   hub-max-players: 100
-  hub-soft-limit: 50
   reserved-slots: 5
 
 check-interval-seconds: 10

@@ -19,7 +19,6 @@ public final class PluginConfig {
     private final List<String> hubServers;
     private final String fallbackServer;
     private final int pingIntervalSeconds;
-    private final int maxRetries;
     private final long retryCooldownMs;
     private final int quarantineThreshold;
     private final long quarantineDurationMs;
@@ -43,13 +42,13 @@ public final class PluginConfig {
 
         this.fallbackServer       = cfg.getString("fallback.fallback-server", "limbo-wait");
         this.pingIntervalSeconds  = clamp(cfg.getInt("check-interval-seconds", 10), 1, 300);
-        this.maxRetries           = clamp(cfg.getInt("routing.max-retries", 3), 1, 20);
         this.retryCooldownMs      = clampL(cfg.getLong("routing.retry-cooldown-ms", 5000L), 500L, 60_000L);
         this.quarantineThreshold  = clamp(cfg.getInt("routing.quarantine-threshold", 3), 1, 50);
         this.quarantineDurationMs = clampL(cfg.getLong("routing.quarantine-duration-ms", 60_000L), 5_000L, 600_000L);
         this.debugMode            = cfg.getBoolean("debug.enabled", false);
         this.hardPlayerLimit      = clamp(cfg.getInt("players.hub-max-players", 100), 1, 10_000);
-        this.reservedSlots        = clamp(cfg.getInt("players.reserved-slots", 5), 0, 1_000);
+        this.reservedSlots        = Math.min(
+                clamp(cfg.getInt("players.reserved-slots", 5), 0, 1_000), hardPlayerLimit - 1);
         this.routingEnabled       = cfg.getBoolean("routing.enabled", true);
         this.fallbackEnabled      = cfg.getBoolean("fallback.enabled", true);
         this.titlesEnabled        = cfg.getBoolean("titles.enabled", true);
@@ -89,7 +88,6 @@ public final class PluginConfig {
     public List<String> getHubServers()        { return hubServers; }
     public String getFallbackServer()          { return fallbackServer; }
     public int getPingIntervalSeconds()        { return pingIntervalSeconds; }
-    public int getMaxRetries()                 { return maxRetries; }
     public long getRetryCooldownMs()           { return retryCooldownMs; }
     public int getQuarantineThreshold()        { return quarantineThreshold; }
     public long getQuarantineDurationMs()      { return quarantineDurationMs; }

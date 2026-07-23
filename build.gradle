@@ -5,12 +5,14 @@ plugins {
 group = 'si.terona'
 version = '1.0.5'
 
-// Use source/target compatibility set to Java 17. We avoid the Gradle
-// auto-provisioning toolchain here to prevent build failures when the
-// default toolchain download repository plugin isn't available in the IDE.
-// The build will use the local JDK (JAVA_HOME / org.gradle.java.home).
-sourceCompatibility = '17'
-targetCompatibility = '17'
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 17
+}
 
 repositories {
     mavenCentral()

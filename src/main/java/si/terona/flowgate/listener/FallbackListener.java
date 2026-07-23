@@ -1,6 +1,5 @@
 package si.terona.flowgate.listener;
 
-import net.md_5.bungee.api.chat.BaseComponent;
 import net.md_5.bungee.api.chat.TextComponent;
 import net.md_5.bungee.api.config.ServerInfo;
 import net.md_5.bungee.api.connection.ProxiedPlayer;
@@ -15,9 +14,6 @@ import si.terona.flowgate.model.RoutingResult;
 import si.terona.flowgate.title.TitleManager;
 
 public final class FallbackListener implements Listener {
-
-    private static final BaseComponent[] EMPTY_REASON =
-            new BaseComponent[]{ new TextComponent("") };
 
     private final FlowGate plugin;
 
@@ -47,7 +43,7 @@ public final class FallbackListener implements Listener {
 
         event.setCancelled(true);
         event.setCancelServer(target);
-        event.setKickReasonComponent(EMPTY_REASON);
+        event.setReason(new TextComponent(""));
 
         plugin.getMetricsService().recordFallback();
         plugin.debug("Kick-fallback: " + player.getName() + " (" + kickedFrom + ") -> " + result.getServerName());

@@ -14,7 +14,7 @@ public final class TFBCommand extends Command {
     private final FlowGate plugin;
 
     public TFBCommand(FlowGate plugin) {
-        super("flowgate", "flowgate.command.reload");
+        super("flowgate");
         this.plugin = plugin;
     }
 
@@ -27,6 +27,10 @@ public final class TFBCommand extends Command {
 
         switch (args[0].toLowerCase()) {
             case "reload":
+                if (!sender.hasPermission("flowgate.command.reload")) {
+                    send(sender, "commands.no-permission");
+                    return;
+                }
                 if (!plugin.reloadAll()) {
                     msg(sender, "&c[FlowGate-Lite] Reload failed. Check the console.");
                 } else {
@@ -35,6 +39,11 @@ public final class TFBCommand extends Command {
                 break;
 
             case "status":
+                if (!sender.hasPermission("flowgate.command.reload")
+                        && !sender.hasPermission("flowgate.command.status")) {
+                    send(sender, "commands.no-permission");
+                    return;
+                }
                 sendStatus(sender);
                 break;
 

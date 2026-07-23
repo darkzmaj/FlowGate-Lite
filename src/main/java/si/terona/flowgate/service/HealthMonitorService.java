@@ -25,6 +25,7 @@ public final class HealthMonitorService {
 
     private final ConcurrentHashMap<String, ServerHealth> healthCache = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, AtomicInteger> failureCounters = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Long> inFlightProbes = new ConcurrentHashMap<>();
 
     private ScheduledExecutorService scheduler;
     private final AtomicLong generation = new AtomicLong(0L);
@@ -70,6 +71,7 @@ public final class HealthMonitorService {
         }
         healthCache.clear();
         failureCounters.clear();
+        inFlightProbes.clear();
     }
 
     public void reload(PluginConfig config) {
@@ -102,8 +104,10 @@ public final class HealthMonitorService {
                 }
 
                 final String name = serverName;
+                if (inFlightProbes.putIfAbsent(name, cycleGeneration) != null) continue;
                 final long start = System.currentTimeMillis();
                 info.ping((result, error) -> {
+                    inFlightProbes.remove(name, cycleGeneration);
                     if (generation.get() != cycleGeneration) return;
                     if (error != null || result == null) {
                         handleFailure(name);

@@ -47,10 +47,10 @@ public final class FlowGate extends Plugin {
     private static FlowGate instance;
 
     // Configuration
-    private Configuration config;
-    private Configuration messages;
-    private Configuration motd;
-    private PluginConfig pluginConfig;
+    private volatile Configuration config;
+    private volatile Configuration messages;
+    private volatile Configuration motd;
+    private volatile PluginConfig pluginConfig;
 
     // Services
     private MetricsService       metricsService;
@@ -72,6 +72,7 @@ public final class FlowGate extends Plugin {
     @Override
     public void onEnable() {
         instance = this;
+        shuttingDown = false;
         if (!startup()) {
             abort();
         }
@@ -81,6 +82,7 @@ public final class FlowGate extends Plugin {
     public void onDisable() {
         shuttingDown = true;
         teardown();
+        instance = null;
         getLogger().info("[FlowGate-Lite] Disabled.");
     }
 
@@ -135,7 +137,7 @@ public final class FlowGate extends Plugin {
         healthMonitorService.start();
         startFallbackScheduler();
 
-        getLogger().info("[FlowGate-Lite] v1.0.6 enabled.");
+        getLogger().info("[FlowGate-Lite] v1.0.7 enabled.");
         return true;
     }
 
@@ -162,7 +164,9 @@ public final class FlowGate extends Plugin {
 
     private void abort() {
         getLogger().severe("[FlowGate-Lite] Startup failed – cleaning up partially initialized state.");
+        shuttingDown = true;
         teardown();
+        instance = null;
     }
 
     // Limbo routing scheduler
@@ -231,7 +235,7 @@ public final class FlowGate extends Plugin {
 
     // Reload
 
-    public boolean reloadAll() {
+    public synchronized boolean reloadAll() {
         Configuration previousConfig = config;
         Configuration previousMessages = messages;
         Configuration previousMotd = motd;

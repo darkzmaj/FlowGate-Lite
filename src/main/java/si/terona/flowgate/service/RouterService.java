@@ -50,7 +50,7 @@ public final class RouterService {
                     ServerHealth health = healthMonitor.getHealth(sticky);
                     if (health != null && health.isAvailable()) {
                         ServerInfo info = ProxyServer.getInstance().getServerInfo(sticky);
-                        if (info != null && getEffectivePlayerCount(info) < limit) {
+                        if (info != null && info.canAccess(player) && getEffectivePlayerCount(info) < limit) {
                             return RoutingResult.success(sticky);
                         }
                     }
@@ -69,7 +69,7 @@ public final class RouterService {
             if (health == null || !health.isAvailable()) continue;
 
             ServerInfo info = ProxyServer.getInstance().getServerInfo(hubName);
-            if (info == null) continue;
+            if (info == null || !info.canAccess(player)) continue;
 
             int count = getEffectivePlayerCount(info);
             if (count >= limit) continue;
@@ -105,7 +105,7 @@ public final class RouterService {
 
         ServerInfo info = ProxyServer.getInstance().getServerInfo(serverName);
         int limit = Math.max(1, config.getHardPlayerLimit() - config.getReservedSlots());
-        if (info == null || getEffectivePlayerCount(info) >= limit) return false;
+        if (info == null || !info.canAccess(player) || getEffectivePlayerCount(info) >= limit) return false;
 
         reservations.put(player.getUniqueId(), new Reservation(info.getName(), System.currentTimeMillis()));
         return true;
@@ -137,7 +137,7 @@ public final class RouterService {
             if (health == null || !health.isAvailable()) continue;
 
             ServerInfo info = ProxyServer.getInstance().getServerInfo(hubName);
-            if (info == null) continue;
+            if (info == null || !info.canAccess(player)) continue;
 
             int count = getEffectivePlayerCount(info);
             if (count >= limit) continue;
@@ -154,6 +154,7 @@ public final class RouterService {
 
     /** Selects a failover target and reserves capacity when it is a hub. */
     public synchronized RoutingResult reserveFallback(ProxiedPlayer player, String failedServer) {
+        purgeExpiredReservations();
         RoutingResult result = findFallback(player, failedServer);
         if (result.isSuccess() && isHub(result.getServerName())) {
             reservations.put(player.getUniqueId(),
@@ -168,7 +169,7 @@ public final class RouterService {
             return RoutingResult.failure("No fallback server configured");
         }
         ServerInfo fallback = ProxyServer.getInstance().getServerInfo(name);
-        if (fallback == null) {
+        if (fallback == null || !fallback.canAccess(player)) {
             return RoutingResult.failure("Fallback server '" + name + "' not found in proxy");
         }
         if (name.equalsIgnoreCase(currentServerName(player))) {
@@ -204,12 +205,12 @@ public final class RouterService {
         if (config.getPluginMessageAllowedConnectServers().isEmpty()) {
             return isHub(serverName) || isFallback(serverName);
         }
-        return config.getPluginMessageAllowedConnectServers().contains(serverName.toLowerCase());
+        return config.getPluginMessageAllowedConnectServers().contains(serverName.toLowerCase(java.util.Locale.ROOT));
     }
 
     public boolean isPluginMessageSourceAllowed(String serverName) {
         return serverName != null && (config.getPluginMessageAllowedSourceServers().isEmpty()
-                || config.getPluginMessageAllowedSourceServers().contains(serverName.toLowerCase()));
+                || config.getPluginMessageAllowedSourceServers().contains(serverName.toLowerCase(java.util.Locale.ROOT)));
     }
 
     private static String currentServerName(ProxiedPlayer player) {

@@ -39,7 +39,8 @@ public final class PluginMessageListener implements Listener {
 
     @EventHandler
     public void onPluginMessage(PluginMessageEvent event) {
-        if (!event.getTag().equals("BungeeCord")) return;
+        if (event.isCancelled() || plugin.isShuttingDown()) return;
+        if (!event.getTag().equals("BungeeCord") && !event.getTag().equals("bungeecord:main")) return;
 
         // Backend → proxy messages have Server as sender; receiver is the ProxiedPlayer.
         if (!(event.getSender() instanceof Server)) return;
@@ -48,6 +49,11 @@ public final class PluginMessageListener implements Listener {
         ProxiedPlayer player = (ProxiedPlayer) event.getReceiver();
         Server source = (Server) event.getSender();
 
+        // A delayed message from a previous backend must never control the current connection.
+        if (player.getServer() != source || event.getData().length > 32766) {
+            event.setCancelled(true);
+            return;
+        }
         ByteArrayDataInput in = ByteStreams.newDataInput(event.getData());
         String subchannel;
         try {
@@ -70,7 +76,7 @@ public final class PluginMessageListener implements Listener {
         }
 
         ServerInfo target = plugin.getProxy().getServerInfo(targetServerName);
-        if (target == null || !plugin.getRouterService().isPluginMessageDestinationAllowed(targetServerName)) {
+        if (target == null || !target.canAccess(player) || !plugin.getRouterService().isPluginMessageDestinationAllowed(targetServerName)) {
             plugin.debug("Plugin message blocked: disallowed destination '" + targetServerName + "'");
             event.setCancelled(true);
             return;

@@ -58,7 +58,11 @@ public final class TitleManager {
 
     /** Stops showing titles for {@code player} and clears the screen title. */
     public static void clear(ProxiedPlayer player) {
-        if (player != null) clearByUUID(player.getUniqueId());
+        if (player != null) {
+            boolean active = ACTIVE.contains(player.getUniqueId());
+            clearByUUID(player.getUniqueId());
+            if (active && player.isConnected()) player.sendTitle(ProxyServer.getInstance().createTitle().reset());
+        }
     }
 
     /** Cancels the global scheduler and clears all active title sessions. Call from {@code onDisable()}. */
@@ -122,7 +126,7 @@ public final class TitleManager {
         STEPS.put(uuid, step + 1);
 
         BaseComponent[] title    = components(messages.getString("titles.waiting.title", ""));
-        BaseComponent[] subtitle = components(frames.get(step % frames.size()));
+        BaseComponent[] subtitle = components(frames.get(Math.floorMod(step, frames.size())));
 
         player.sendTitle(
                 ProxyServer.getInstance()

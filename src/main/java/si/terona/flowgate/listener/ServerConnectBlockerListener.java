@@ -21,7 +21,7 @@ public final class ServerConnectBlockerListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onServerConnect(ServerConnectEvent event) {
-        if (plugin.isShuttingDown()) return;
+        if (plugin.isShuttingDown() || event.isCancelled()) return;
         if (event.getReason() != ServerConnectEvent.Reason.JOIN_PROXY) return;
         if (!plugin.getPluginConfig().isRoutingEnabled()) return;
 

@@ -31,7 +31,7 @@ public final class SlashServerCommand extends Command {
         ProxiedPlayer player = (ProxiedPlayer) sender;
 
         ServerInfo target = ProxyServer.getInstance().getServerInfo(targetServer);
-        if (target == null) {
+        if (target == null || !target.canAccess(player)) {
             sendKey(player, "slash-server.not-exist");
             return;
         }

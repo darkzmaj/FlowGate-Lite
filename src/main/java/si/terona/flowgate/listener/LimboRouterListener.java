@@ -1,7 +1,7 @@
 package si.terona.flowgate.listener;
 
 import net.md_5.bungee.api.connection.ProxiedPlayer;
-import net.md_5.bungee.api.event.ServerConnectedEvent;
+import net.md_5.bungee.api.event.ServerSwitchEvent;
 import net.md_5.bungee.api.event.PlayerDisconnectEvent;
 import net.md_5.bungee.api.plugin.Listener;
 import net.md_5.bungee.event.EventHandler;
@@ -21,11 +21,16 @@ public final class LimboRouterListener implements Listener {
     }
 
     @EventHandler
-    public void onServerConnected(ServerConnectedEvent event) {
+    public void onServerConnected(ServerSwitchEvent event) {
         ProxiedPlayer player = event.getPlayer();
-        if (player == null) return;
+        if (player == null || plugin.isShuttingDown()) return;
         plugin.getRouterService().releaseReservation(player.getUniqueId());
-        if (!plugin.isOnFallback(player)) return;
+        if (!plugin.isOnFallback(player)) {
+            plugin.getSearchingPlayers().remove(player.getUniqueId());
+            plugin.getPlayerSessionService().markConnected(player.getUniqueId(), player.getServer().getInfo().getName());
+            TitleManager.clear(player);
+            return;
+        }
 
         UUID uuid = player.getUniqueId();
         if (!plugin.getSearchingPlayers().add(uuid)) return;
@@ -43,7 +48,7 @@ public final class LimboRouterListener implements Listener {
     @EventHandler
     public void onPlayerDisconnect(PlayerDisconnectEvent event) {
         ProxiedPlayer player = event.getPlayer();
-        if (player == null) return;
+        if (player == null || plugin.isShuttingDown()) return;
 
         UUID uuid = player.getUniqueId();
         plugin.getSearchingPlayers().remove(uuid);

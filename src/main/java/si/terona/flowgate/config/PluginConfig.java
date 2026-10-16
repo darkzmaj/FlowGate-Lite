@@ -59,7 +59,7 @@ public final class PluginConfig {
         if (cfg.get("server-weights") instanceof Configuration) {
             for (String server : cfg.getSection("server-weights").getKeys()) {
                 int w = cfg.getInt("server-weights." + server, 1);
-                weights.put(server.toLowerCase(), clamp(w, 1, 1000));
+                weights.put(server.toLowerCase(java.util.Locale.ROOT), clamp(w, 1, 1000));
             }
         }
         this.serverWeights = Collections.unmodifiableMap(weights);
@@ -71,7 +71,7 @@ public final class PluginConfig {
     }
 
     public int getServerWeight(String serverName) {
-        return serverWeights.getOrDefault(serverName.toLowerCase(), 1);
+        return serverWeights.getOrDefault(serverName.toLowerCase(java.util.Locale.ROOT), 1);
     }
 
     private static int clamp(int v, int min, int max) { return Math.max(min, Math.min(max, v)); }
@@ -80,7 +80,7 @@ public final class PluginConfig {
     private static Set<String> readLowerCaseSet(List<String> values) {
         Set<String> result = new HashSet<>();
         for (String value : values) {
-            if (value != null && !value.trim().isEmpty()) result.add(value.toLowerCase());
+            if (value != null && !value.trim().isEmpty()) result.add(value.toLowerCase(java.util.Locale.ROOT));
         }
         return Collections.unmodifiableSet(result);
     }

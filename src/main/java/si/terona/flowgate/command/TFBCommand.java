@@ -25,7 +25,7 @@ public final class TFBCommand extends Command {
             return;
         }
 
-        switch (args[0].toLowerCase()) {
+        switch (args[0].toLowerCase(java.util.Locale.ROOT)) {
             case "reload":
                 if (!sender.hasPermission("flowgate.command.reload")) {
                     send(sender, "commands.no-permission");
@@ -54,7 +54,7 @@ public final class TFBCommand extends Command {
     }
 
     private void sendStatus(CommandSender sender) {
-        msg(sender, "&b[FlowGate-Lite] &fv1.0.6 Status");
+        msg(sender, "&b[FlowGate-Lite] &fv1.0.7 Status");
 
         Map<String, ServerHealth> health = plugin.getHealthMonitorService().getAllHealth();
         if (health.isEmpty()) {

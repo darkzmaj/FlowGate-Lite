@@ -9,6 +9,7 @@ public final class PlayerSession {
 
     private final UUID playerId;
     private final String playerName;
+    private final java.util.Set<String> failedServers = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     private final AtomicReference<ConnectionState> state = new AtomicReference<>(ConnectionState.IDLE);
     private final AtomicInteger retryCount = new AtomicInteger(0);
@@ -22,6 +23,11 @@ public final class PlayerSession {
         this.playerId = playerId;
         this.playerName = playerName;
     }
+
+    public boolean recordFailedServer(String name) {
+        return name == null || failedServers.add(name.toLowerCase(java.util.Locale.ROOT));
+    }
+    public void clearFailedServers() { failedServers.clear(); }
 
     // State transitions
 

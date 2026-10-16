@@ -1,4 +1,4 @@
 name: FlowGate-Lite
-version: 1.0.6
+version: ${version}
 main: si.terona.flowgate.FlowGate
 author: Terona Studios

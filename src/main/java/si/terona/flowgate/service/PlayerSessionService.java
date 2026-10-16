@@ -75,6 +75,7 @@ public final class PlayerSessionService {
     public void markConnected(UUID playerId, String serverName) {
         PlayerSession session = sessions.get(playerId);
         if (session != null) {
+            session.clearFailedServers();
             session.resetRetry();
             session.setState(ConnectionState.CONNECTED);
             session.recordSuccessfulServer(serverName);

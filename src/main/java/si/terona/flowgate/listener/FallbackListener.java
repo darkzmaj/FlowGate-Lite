@@ -23,7 +23,7 @@ public final class FallbackListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onServerKick(ServerKickEvent event) {
-        if (plugin.isShuttingDown()) return;
+        if (plugin.isShuttingDown() || event.isCancelled()) return;
         if (!plugin.getPluginConfig().isFallbackEnabled()) return;
 
         ProxiedPlayer player = event.getPlayer();
@@ -31,6 +31,11 @@ public final class FallbackListener implements Listener {
         if (plugin.isOnFallback(player)) return;
 
         String kickedFrom = event.getKickedFrom() != null ? event.getKickedFrom().getName() : null;
+        PlayerSession failedSession = plugin.getPlayerSessionService().getOrCreate(player);
+        if (!failedSession.recordFailedServer(kickedFrom)) {
+            plugin.debug("Fallback stopped: repeated rejection by the same backend");
+            return;
+        }
         RoutingResult result = plugin.getRouterService().reserveFallback(player, kickedFrom);
 
         if (!result.isSuccess()) {

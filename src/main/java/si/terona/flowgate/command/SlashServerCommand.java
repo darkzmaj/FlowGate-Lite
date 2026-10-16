@@ -31,7 +31,7 @@ public final class SlashServerCommand extends Command {
         ProxiedPlayer player = (ProxiedPlayer) sender;
 
         ServerInfo target = ProxyServer.getInstance().getServerInfo(targetServer);
-        if (target == null) {
+        if (target == null || !target.canAccess(player)) {
             sendKey(player, "slash-server.not-exist");
             return;
         }
@@ -64,7 +64,7 @@ public final class SlashServerCommand extends Command {
 
         String fallbackName = plugin.getPluginConfig().getFallbackServer();
         ServerInfo fallback = ProxyServer.getInstance().getServerInfo(fallbackName);
-        if (fallback == null) return;
+        if (fallback == null || !fallback.canAccess(player)) return;
 
         if (player.getServer() != null &&
                 player.getServer().getInfo().getName().equalsIgnoreCase(fallbackName)) {

@@ -3,7 +3,7 @@ plugins {
 }
 
 group = 'si.terona'
-version = '1.0.6'
+version = '1.0.7'
 
 java {
     sourceCompatibility = JavaVersion.VERSION_17
@@ -41,3 +41,24 @@ jar {
     archiveBaseName.set("FlowGate-Lite")
     archiveVersion.set(project.version.toString())
 }
+
+// Platform APIs are provided by the proxy; tests use the same API without shading it.
+dependencies {
+    testImplementation 'net.md-5:bungeecord-api:1.21-R0.4'
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.14.1'
+    testImplementation 'org.mockito:mockito-core:5.20.0'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+test { useJUnitPlatform() }
+def pluginVersion = project.version.toString()
+processResources {
+    inputs.property 'version', pluginVersion
+    filesMatching('bungee.yml') { expand(version: pluginVersion) }
+}
+tasks.withType(AbstractArchiveTask).configureEach {
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+}
+tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
+
+tasks.withType(JavaCompile).configureEach { options.compilerArgs += ['-Xlint:deprecation', '-Xlint:unchecked'] }

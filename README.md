@@ -1,3 +1,11 @@
+## Maintenance release 1.0.7
+
+Use a maintained **BungeeCord build 2104 or newer** for Minecraft Java 26.3 (protocol 777). Tested on Java 21. Plugin bytecode remains Java 17; follow your proxy's runtime requirement. Waterfall is discontinued and is only a legacy, untested target: do not use it to claim 26.3 support. FlowGate Lite remains a Bungee API plugin; Velocity requires migration to an equivalent router and cannot load this JAR.
+
+Existing configuration and the backend `BungeeCord` / `Connect` wire format are preserved. All routes now honor Bungee restricted-server access. Backend servers are trusted infrastructure: firewall them from direct client access, and narrow `plugin-messages.allowed-source-servers` where practical. This plugin forwards connections, never privileged console commands.
+
+Build with JDK 25: `bash gradlew clean build`. Output: `build/libs/FlowGate-Lite-1.0.7.jar`. See [CHANGELOG.md](CHANGELOG.md) for fixes and validation limits.
+
 # FlowGate-Lite
 
 **FlowGate-Lite** is a production-grade BungeeCord proxy plugin for intelligent hub routing, backend health monitoring, automatic failover, and controlled player distribution across Minecraft server networks.
@@ -73,7 +81,7 @@ On disable, the plugin cancels the limbo task, shuts down the health monitor exe
 
 ## Installation
 
-1. Drop `FlowGate-Lite-1.0.6.jar` into your proxy's `plugins/` directory.
+1. Drop `FlowGate-Lite-1.0.7.jar` into your proxy's `plugins/` directory.
 2. Restart the proxy. Config files are generated automatically.
 3. Edit `plugins/FlowGate-Lite/config.yml` with your server names.
 4. Edit `plugins/FlowGate-Lite/messages.yml` and `motd.yml` as needed.
@@ -81,7 +89,7 @@ On disable, the plugin cancels the limbo task, shuts down the health monitor exe
 
 **Requirements:**
 - Java 17 or newer
-- BungeeCord / Waterfall / FlameCord (BungeeCord API 1.21+)
+- BungeeCord build 2104 for Minecraft 26.3; Waterfall/FlameCord are untested legacy forks
 
 ---
 
@@ -226,9 +234,9 @@ The router computes a score of `playerCount / weight`. A server with weight 3 wi
 
 | Platform | Status |
 |----------|--------|
-| BungeeCord | ✓ Supported |
-| Waterfall | ✓ Supported |
-| FlameCord | ✓ Supported |
+| BungeeCord | Verified: build 2104, protocol 777 / MC 26.3 |
+| Waterfall | Discontinued; legacy only, untested |
+| FlameCord | Untested legacy fork |
 | Velocity | ✗ Not compatible (different API) |
 
 **Java:** 17+

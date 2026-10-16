@@ -1,0 +1,192 @@
+name: Publish release JAR
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Existing version tag to build (for example v1.0.7)'
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.event.inputs.version || github.ref_name }}
+  cancel-in-progress: false
+jobs:
+  build:
+    if: github.event_name == 'push' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+      commit: ${{ steps.resolve.outputs.commit }}
+    steps:
+      - name: Resolve and verify the intended release tag
+        id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.inputs.version || github.ref_name }}
+          REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          python3 - <<'PYCODE'
+          import json, os, re, subprocess
+          tag = os.environ['RELEASE_TAG']
+          if not re.fullmatch(r'v[0-9]+\.[0-9]+\.[0-9]+', tag):
+              raise SystemExit('Use an existing stable vMAJOR.MINOR.PATCH tag')
+          def api(path):
+              return json.loads(subprocess.check_output(['gh', 'api', path]))
+          repo = os.environ['REPOSITORY']
+          obj = api(f'repos/{repo}/git/ref/tags/{tag}')['object']
+          for _ in range(8):
+              if obj['type'] == 'commit':
+                  break
+              if obj['type'] != 'tag':
+                  raise SystemExit('Release tag does not reference a commit')
+              obj = api(f'repos/{repo}/git/tags/{obj["sha"]}')['object']
+          else:
+              raise SystemExit('Excessively nested tag')
+          expected = {'v1.0.7': 'ce23d7737942c62f93af40069007fe574b5fa7f4'}
+          if tag in expected and obj['sha'] != expected[tag]:
+              raise SystemExit('Published release tag differs from the audited commit')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
+              out.write(f'tag={tag}\ncommit={obj["sha"]}\n')
+          PYCODE
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.resolve.outputs.commit }}
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - name: Clean build and existing regression tests
+        run: bash gradlew clean build --no-daemon --warning-mode all
+      - name: Verify distributable, test results, and checksum
+        env:
+          RELEASE_TAG: ${{ steps.resolve.outputs.tag }}
+        run: |
+          python3 - <<'PYCODE'
+          import hashlib, json, os, pathlib, re, shutil, struct, xml.etree.ElementTree as ET, zipfile
+          version = os.environ['RELEASE_TAG'][1:]
+          name = 'FlowGate-Lite-' + version + '.jar'
+          jar = pathlib.Path('build/libs') / name
+          reports = list(pathlib.Path('build/test-results/test').glob('TEST-*.xml'))
+          if not reports:
+              raise SystemExit('Missing test reports')
+          tests = failures = skipped = 0
+          for report in reports:
+              root = ET.parse(report).getroot()
+              tests += int(root.attrib['tests'])
+              failures += int(root.attrib.get('failures', 0)) + int(root.attrib.get('errors', 0))
+              skipped += int(root.attrib.get('skipped', 0))
+          if tests < 8 or failures or skipped:
+              raise SystemExit(f'Unexpected test results: {tests} tests, {failures} failures, {skipped} skipped')
+          with zipfile.ZipFile(jar) as archive:
+              if archive.testzip() is not None:
+                  raise SystemExit('Corrupt JAR')
+              entries = archive.namelist()
+              if len(entries) != len(set(entries)):
+                  raise SystemExit('Duplicate JAR entries')
+              descriptors = [p for p in ('plugin.yml', 'bungee.yml', 'velocity-plugin.json') if p in entries]
+              if not descriptors:
+                  raise SystemExit('Missing plugin metadata')
+              for descriptor in descriptors:
+                  content = archive.read(descriptor).decode('utf-8')
+                  if descriptor.endswith('.json'):
+                      actual = json.loads(content)['version']
+                  else:
+                      match = re.search(r'^version:\s*[\'\"]?([^\'\"\s]+)', content, re.M)
+                      actual = match.group(1) if match else None
+                  if actual != version:
+                      raise SystemExit(f'Incorrect version in {descriptor}: {actual}')
+              classes = [p for p in entries if p.endswith('.class') and not p.startswith('META-INF/versions/')]
+              if not any(p.startswith('si/terona/') for p in classes):
+                  raise SystemExit('Not a compiled plugin JAR')
+              for entry in classes:
+                  header = archive.read(entry)[:8]
+                  if header[:4] != b'\xca\xfe\xba\xbe' or struct.unpack('>H', header[6:8])[0] > 61:
+                      raise SystemExit(f'Unexpected bytecode: {entry}')
+              if 'FlowGate-Lite' == 'NullBrand':
+                  required = ['si/terona/nullbrand/internal/yaml/Yaml.class', 'META-INF/LICENSE-SnakeYAML.txt']
+                  if not all(p in entries for p in required):
+                      raise SystemExit('Missing shaded parser or license; do not publish the plain JAR')
+          digest = hashlib.sha256(jar.read_bytes()).hexdigest()
+          expected = {'1.0.7': '8f02974e410e0f2a5da3443172b52f15748f6740e7cd8bb8ee2572620dc7789b'}
+          if version in expected and digest != expected[version]:
+              raise SystemExit(f'Reproducibility mismatch; original {expected[version]}, rebuilt {digest}')
+          output = pathlib.Path('release-artifact')
+          output.mkdir()
+          shutil.copyfile(jar, output / name)
+          (output / (name + '.sha256')).write_text(f'{digest}  {name}\n')
+          print(f'{tests} tests passed; verified {name}: {digest}')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+              summary.write(f'{tests} tests passed. Verified compiled plugin `{name}`. SHA-256: `{digest}`\n')
+          PYCODE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-jar
+          path: release-artifact/*
+          if-no-files-found: error
+          retention-days: 30
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-jar
+          path: release-artifact
+      - name: Attach verified JAR without replacing existing assets or tags
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.build.outputs.tag }}
+          EXPECTED_COMMIT: ${{ needs.build.outputs.commit }}
+        run: |
+          python3 - <<'PYCODE'
+          import hashlib, json, os, pathlib, subprocess, tempfile
+          repo, tag = os.environ['GH_REPO'], os.environ['RELEASE_TAG']
+          def api(path):
+              return json.loads(subprocess.check_output(['gh', 'api', path]))
+          obj = api(f'repos/{repo}/git/ref/tags/{tag}')['object']
+          for _ in range(8):
+              if obj['type'] == 'commit':
+                  break
+              obj = api(f'repos/{repo}/git/tags/{obj["sha"]}')['object']
+          if obj['type'] != 'commit' or obj['sha'] != os.environ['EXPECTED_COMMIT']:
+              raise SystemExit('Release tag changed during build; refusing publication')
+          # Preserve every existing release body, tag and asset. For future tags only,
+          # create a release after all tests and artifact validation have succeeded.
+          releases = subprocess.run(['gh', 'release', 'view', tag, '--json', 'id'], capture_output=True)
+          if releases.returncode:
+              # Distinguish a genuinely absent release from authorization/network errors.
+              listing = api(f'repos/{repo}/releases?per_page=100')
+              if any(r['tag_name'] == tag for r in listing):
+                  raise SystemExit('Existing release could not be read')
+              subprocess.run(['gh', 'release', 'create', tag, '--verify-tag', '--title', f'FlowGate-Lite {tag}',
+                              '--notes', 'Verified release JAR. See CHANGELOG.md for changes.'], check=True)
+          release = api(f'repos/{repo}/releases/tags/{tag}')
+          files = sorted(pathlib.Path('release-artifact').iterdir())
+          jars = [p for p in files if p.suffix == '.jar']
+          if len(jars) != 1:
+              raise SystemExit('Expected exactly one distributable JAR')
+          jar = jars[0]
+          digest = hashlib.sha256(jar.read_bytes()).hexdigest()
+          if (jar.with_suffix('.jar.sha256')).read_text().split()[0] != digest:
+              raise SystemExit('Downloaded Actions artifact checksum mismatch')
+          for file in files:
+              existing = next((a for a in release['assets'] if a['name'] == file.name), None)
+              if existing:
+                  with tempfile.TemporaryDirectory() as directory:
+                      subprocess.run(['gh', 'release', 'download', tag, '--pattern', file.name, '--dir', directory], check=True)
+                      remote = pathlib.Path(directory, file.name).read_bytes()
+                  if hashlib.sha256(remote).digest() != hashlib.sha256(file.read_bytes()).digest():
+                      raise SystemExit(f'Existing asset differs: {file.name}; no asset was replaced')
+                  print(f'Existing identical asset retained: {file.name}')
+              else:
+                  subprocess.run(['gh', 'release', 'upload', tag, str(file)], check=True)
+                  print(f'Published {file.name}')
+          PYCODE

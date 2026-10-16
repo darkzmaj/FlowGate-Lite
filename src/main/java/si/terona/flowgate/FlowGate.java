@@ -106,11 +106,11 @@ public final class FlowGate extends Plugin {
         }
         if (fatal) return false;
 
-        if (!validateMessages()) {
+        if (!validateMessages(messages)) {
             getLogger().severe("[FlowGate-Lite] Invalid messages.yml");
             return false;
         }
-        if (!validateMotd()) {
+        if (!validateMotd(motd)) {
             getLogger().severe("[FlowGate-Lite] Invalid motd.yml");
             return false;
         }
@@ -236,32 +236,36 @@ public final class FlowGate extends Plugin {
     // Reload
 
     public synchronized boolean reloadAll() {
-        Configuration previousConfig = config;
-        Configuration previousMessages = messages;
-        Configuration previousMotd = motd;
-        if (!loadConfig() || !loadMessages() || !loadMotd()) {
-            restoreConfiguration(previousConfig, previousMessages, previousMotd);
+        Configuration nextConfig;
+        Configuration nextMessages;
+        Configuration nextMotd;
+        try {
+            nextConfig = loadConfigurationFile("config.yml");
+            nextMessages = loadConfigurationFile("messages.yml");
+            nextMotd = loadConfigurationFile("motd.yml");
+        } catch (Exception failure) {
             getLogger().severe("[FlowGate-Lite] Reload failed: cannot parse config files.");
             return false;
         }
 
-        List<String> errors = ConfigValidator.validate(config, getProxy());
+        List<String> errors = ConfigValidator.validate(nextConfig, getProxy());
         for (String err : errors) {
             if (isFatalConfigError(err)) {
-                restoreConfiguration(previousConfig, previousMessages, previousMotd);
                 getLogger().severe("[FlowGate-Lite] Reload failed: " + err);
                 return false;
             }
             getLogger().warning("[FlowGate-Lite] Config warning: " + err);
         }
 
-        if (!validateMessages() || !validateMotd()) {
-            restoreConfiguration(previousConfig, previousMessages, previousMotd);
+        if (!validateMessages(nextMessages) || !validateMotd(nextMotd)) {
             getLogger().severe("[FlowGate-Lite] Reload failed: invalid messages.yml or motd.yml.");
             return false;
         }
 
-        PluginConfig reloadedConfig = new PluginConfig(config);
+        PluginConfig reloadedConfig = new PluginConfig(nextConfig);
+        config = nextConfig;
+        messages = nextMessages;
+        motd = nextMotd;
         pluginConfig = reloadedConfig;
         routerService.reload(reloadedConfig);
         playerSessionService.reload(reloadedConfig);
@@ -397,6 +401,14 @@ public final class FlowGate extends Plugin {
         }
     }
 
+    private Configuration loadConfigurationFile(String name) throws Exception {
+        ensureDataFolder();
+        File file = copyDefaultIfAbsent(name);
+        Configuration loaded = ConfigurationProvider.getProvider(YamlConfiguration.class).load(file);
+        mergeDefaults(loaded, name, file);
+        return loaded;
+    }
+
     private void ensureDataFolder() {
         if (!getDataFolder().exists()) getDataFolder().mkdirs();
     }
@@ -436,19 +448,13 @@ public final class FlowGate extends Plugin {
         return changed;
     }
 
-    private void restoreConfiguration(Configuration previousConfig, Configuration previousMessages, Configuration previousMotd) {
-        config = previousConfig;
-        messages = previousMessages;
-        motd = previousMotd;
-    }
-
     private static boolean isFatalConfigError(String error) {
         return !error.endsWith("(will be skipped)");
     }
 
     // Validation
 
-    private boolean validateMessages() {
+    private boolean validateMessages(Configuration messages) {
         if (messages == null) return false;
         for (String key : new String[]{
                 "commands.reload", "commands.usage", "commands.unknown",
@@ -462,7 +468,7 @@ public final class FlowGate extends Plugin {
         return true;
     }
 
-    private boolean validateMotd() {
+    private boolean validateMotd(Configuration motd) {
         if (motd == null) return false;
         if (!motd.contains("motd")) { getLogger().severe("[FlowGate-Lite] motd.yml missing 'motd' key"); return false; }
         String active = motd.getString("motd");

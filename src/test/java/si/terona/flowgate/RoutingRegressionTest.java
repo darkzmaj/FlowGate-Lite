@@ -66,4 +66,73 @@ class RoutingRegressionTest {
             assertTrue(cfg.getPluginMessageAllowedSourceServers().contains("minigame"));
         } finally { Locale.setDefault(before); }
     }
+
+    @Test void repeatedBackendRejectionsAreBoundedUntilSuccessfulConnection() {
+        si.terona.flowgate.model.PlayerSession session = new si.terona.flowgate.model.PlayerSession(UUID.randomUUID(), "tester");
+        assertTrue(session.recordFailedServer("Hub"));
+        assertTrue(session.recordFailedServer("limbo"));
+        assertFalse(session.recordFailedServer("HUB"));
+        session.clearFailedServers();
+        assertTrue(session.recordFailedServer("hub"));
+    }
+    @Test void concurrentPluginMessagesCannotExceedThePerPlayerWindow() throws Exception {
+        PluginMessageListener listener = new PluginMessageListener(mock(FlowGate.class));
+        java.lang.reflect.Method rate = PluginMessageListener.class.getDeclaredMethod("isRateLimited", UUID.class);
+        rate.setAccessible(true);
+        UUID id = UUID.randomUUID();
+        java.util.concurrent.atomic.AtomicInteger accepted = new java.util.concurrent.atomic.AtomicInteger();
+        java.util.stream.IntStream.range(0, 100).parallel().forEach(i -> {
+            try { if (!(boolean) rate.invoke(listener, id)) accepted.incrementAndGet(); }
+            catch (Exception error) { throw new RuntimeException(error); }
+        });
+        assertEquals(10, accepted.get());
+    }
+
+    @Test void restrictedHubsCannotBeReservedOrSelectedWithoutAccess() {
+        Configuration raw = new Configuration(); raw.set("hubs", List.of("hub"));
+        PluginConfig cfg = new PluginConfig(raw);
+        HealthMonitorService health = mock(HealthMonitorService.class);
+        when(health.getHealth("hub")).thenReturn(si.terona.flowgate.model.ServerHealth.online("hub", 1));
+        when(health.isHealthy("hub")).thenReturn(true);
+        ProxyServer proxy = mock(ProxyServer.class);
+        ServerInfo hub = mock(ServerInfo.class);
+        when(proxy.getServerInfo("hub")).thenReturn(hub);
+        when(hub.getName()).thenReturn("hub");
+        when(hub.getPlayers()).thenReturn(List.of());
+        ProxiedPlayer player = mock(ProxiedPlayer.class);
+        when(player.getUniqueId()).thenReturn(UUID.randomUUID());
+        try (org.mockito.MockedStatic<ProxyServer> statics = mockStatic(ProxyServer.class)) {
+            statics.when(ProxyServer::getInstance).thenReturn(proxy);
+            RouterService router = new RouterService(health, cfg);
+            assertFalse(router.reserveHub(player,"hub"));
+            assertFalse(router.findBestHub(player).isSuccess());
+            when(hub.canAccess(player)).thenReturn(true);
+            assertTrue(router.reserveHub(player,"hub"));
+        }
+    }
+
+    @Test void aFullHubStillRoutesInitialJoinToFallback() {
+        FlowGate plugin = mock(FlowGate.class);
+        PluginConfig cfg = mock(PluginConfig.class);
+        when(cfg.isRoutingEnabled()).thenReturn(true); when(cfg.isFallbackEnabled()).thenReturn(true);
+        when(plugin.getPluginConfig()).thenReturn(cfg);
+        ProxiedPlayer player = mock(ProxiedPlayer.class);
+        UUID id = UUID.randomUUID(); when(player.getUniqueId()).thenReturn(id);
+        RouterService router = mock(RouterService.class);
+        PlayerSessionService sessions = mock(PlayerSessionService.class);
+        var session = new si.terona.flowgate.model.PlayerSession(id, "tester");
+        when(sessions.getOrCreate(player)).thenReturn(session);
+        when(router.reserveBestHub(player, session)).thenReturn(si.terona.flowgate.model.RoutingResult.failure("full"));
+        when(router.routeToLimbo(player)).thenReturn(si.terona.flowgate.model.RoutingResult.success("limbo"));
+        when(plugin.getRouterService()).thenReturn(router); when(plugin.getPlayerSessionService()).thenReturn(sessions);
+        when(plugin.getSearchingPlayers()).thenReturn(new HashSet<>());
+        ProxyServer proxy = mock(ProxyServer.class); when(plugin.getProxy()).thenReturn(proxy);
+        ServerInfo fallback = mock(ServerInfo.class); when(proxy.getServerInfo("limbo")).thenReturn(fallback);
+        ServerConnectEvent event = mock(ServerConnectEvent.class);
+        when(event.getPlayer()).thenReturn(player); when(event.getTarget()).thenReturn(mock(ServerInfo.class));
+        when(event.getReason()).thenReturn(ServerConnectEvent.Reason.JOIN_PROXY);
+        new ServerConnectBlockerListener(plugin).onServerConnect(event);
+        verify(event).setTarget(fallback);
+        assertTrue(plugin.getSearchingPlayers().contains(id));
+    }
 }

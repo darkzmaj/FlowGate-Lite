@@ -149,7 +149,9 @@ public final class RouterService {
             }
         }
 
-        return best != null ? RoutingResult.success(best.getName()) : routeToLimbo(player);
+        if (best != null) return RoutingResult.success(best.getName());
+        if (failedServer != null && isFallback(failedServer)) return RoutingResult.failure("Fallback server rejected the connection");
+        return routeToLimbo(player);
     }
 
     /** Selects a failover target and reserves capacity when it is a hub. */

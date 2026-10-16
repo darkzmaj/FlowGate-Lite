@@ -50,12 +50,15 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 test { useJUnitPlatform() }
+def pluginVersion = project.version.toString()
 processResources {
-    inputs.property 'version', project.version
-    filesMatching('bungee.yml') { expand(version: project.version) }
+    inputs.property 'version', pluginVersion
+    filesMatching('bungee.yml') { expand(version: pluginVersion) }
 }
 tasks.withType(AbstractArchiveTask).configureEach {
     preserveFileTimestamps = false
     reproducibleFileOrder = true
 }
 tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
+
+tasks.withType(JavaCompile).configureEach { options.compilerArgs += ['-Xlint:deprecation', '-Xlint:unchecked'] }

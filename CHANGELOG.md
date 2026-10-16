@@ -7,4 +7,6 @@
 - Publish configuration references across proxy threads and serialize reload requests; clear singleton on shutdown/startup failure.
 - Reproducible unshaded archives, Gradle 9.1 wrapper checksum, regression tests and CI; remove generated caches from source control.
 
-Validation: 4 JUnit regression tests; BungeeCord build 2104 startup, protocol 777 (Minecraft 26.3) status/MOTD/hover, console status/reload and shutdown. Live player routing and load tests remain unverified. Stable Bungee API 1.21-R0.4 retained because the public API used here remains compatible with current BungeeCord. No runtime libraries are bundled.
+Validation: 8 JUnit regression tests; BungeeCord build 2104 startup, protocol 777 (Minecraft 26.3) status/MOTD/hover, console status/reload and shutdown. Actual protocol-777 client routing through FlowGate-Bridge between two Paper 26.3 backends is verified, including forged client message rejection. High-load behavior remains unverified. Stable Bungee API 1.21-R0.4 retained because the public API used here remains compatible with current BungeeCord. No runtime libraries are bundled.
+
+- Bound repeated backend rejection chains to prevent infinite kick/fallback loops; route initial joins to limbo when healthy hubs are full. Stage reload candidates before publishing and make per-player message rate windows atomic.

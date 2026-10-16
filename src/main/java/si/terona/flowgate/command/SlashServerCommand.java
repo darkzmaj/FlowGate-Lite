@@ -64,7 +64,7 @@ public final class SlashServerCommand extends Command {
 
         String fallbackName = plugin.getPluginConfig().getFallbackServer();
         ServerInfo fallback = ProxyServer.getInstance().getServerInfo(fallbackName);
-        if (fallback == null) return;
+        if (fallback == null || !fallback.canAccess(player)) return;
 
         if (player.getServer() != null &&
                 player.getServer().getInfo().getName().equalsIgnoreCase(fallbackName)) {

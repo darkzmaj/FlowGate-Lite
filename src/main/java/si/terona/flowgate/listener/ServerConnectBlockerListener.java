@@ -28,15 +28,13 @@ public final class ServerConnectBlockerListener implements Listener {
         ProxiedPlayer player = event.getPlayer();
         if (player == null || event.getTarget() == null) return;
 
-        if (plugin.getRouterService().isAnyHubAvailable()) {
-            RoutingResult result = plugin.getRouterService().reserveBestHub(
-                    player, plugin.getPlayerSessionService().getOrCreate(player));
-            if (result.isSuccess()) {
-                ServerInfo hub = plugin.getProxy().getServerInfo(result.getServerName());
-                if (hub != null && !hub.getName().equalsIgnoreCase(event.getTarget().getName())) {
-                    event.setTarget(hub);
-                    plugin.debug("JOIN_PROXY -> " + hub.getName() + " [" + player.getName() + "]");
-                }
+        RoutingResult result = plugin.getRouterService().reserveBestHub(
+                player, plugin.getPlayerSessionService().getOrCreate(player));
+        if (result.isSuccess()) {
+            ServerInfo hub = plugin.getProxy().getServerInfo(result.getServerName());
+            if (hub != null && !hub.getName().equalsIgnoreCase(event.getTarget().getName())) {
+                event.setTarget(hub);
+                plugin.debug("JOIN_PROXY -> " + hub.getName() + " [" + player.getName() + "]");
             }
         } else if (plugin.getPluginConfig().isFallbackEnabled()) {
             RoutingResult limbo = plugin.getRouterService().routeToLimbo(player);

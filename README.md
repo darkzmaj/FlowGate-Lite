@@ -255,3 +255,11 @@ Future plugins under the FlowGate ecosystem may include advanced cross-proxy coo
 ---
 
 © Terona Studios. All rights reserved.
+
+## Release downloads and publishing
+
+Install the compiled **FlowGate-Lite-<version>.jar** from [GitHub Releases](https://github.com/darkzmaj/FlowGate-Lite/releases); the generated source archives are not installable plugins. Release assets include a SHA-256 file.
+
+The **Publish release JAR** workflow runs for new `vMAJOR.MINOR.PATCH` tags. To attach assets to an existing release, run it manually from `main` with the exact version tag (for example `v1.0.7`). It checks out the resolved tag commit, uses Java 25, runs `clean build` and existing tests, validates plugin metadata and bytecode, and preserves the JAR as an Actions artifact before publishing. The build has read-only repository access; only the separate publishing job has `contents: write`. Existing assets are compared and never overwritten. The audited release tag and original JAR checksum are pinned for v1.0.7; a mismatch stops publication.
+
+Repository Actions must be enabled and permit the workflow's `GITHUB_TOKEN` to request `contents: write` (organization policy must permit it). No personal access token is required. No tag or release needs to be deleted or recreated. See [release notes](docs/releases/v1.0.7.md) for verified platforms and limitations.

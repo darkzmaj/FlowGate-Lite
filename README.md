@@ -236,14 +236,14 @@ The router computes a score of `playerCount / weight`. A server with weight 3 wi
 
 | Platform | Status |
 |----------|--------|
-| BungeeCord | ✓ Smoke-tested on build 2111 (MC 26.x) |
-| Waterfall | ✓ Smoke-tested on build 615 (26.1); upstream is discontinued |
+| BungeeCord | ✓ Player-tested on build 2111 |
+| Waterfall | ✓ Player-tested on build 615; upstream is discontinued |
 | FlameCord and other BungeeCord API forks | ✓ Expected (same API and `bungee.yml` loading); not individually tested |
-| Velocity 4.x | ✓ Smoke-tested on 4.3.1 build 45 (Java 25) |
-| Velocity 3.4+ | ✓ Smoke-tested on 3.4.0 build 566 (Java 17) |
+| Velocity 4.x | ✓ Player-tested on 4.3.1 build 45 (Java 25) |
+| Velocity 3.4+ | ✓ Player-tested on 3.4.0 build 566 (Java 17) |
 | Velocity forks keeping the Velocity plugin API | ✓ Expected; not individually tested |
 
-Smoke tests cover plugin enable, backend health pings, `/flowgate status` and `reload`, server-list MOTD/hover and clean shutdown. Routing real players through each proxy was not repeated for 1.1.0; the routing paths are covered by unit tests.
+Each proxy was tested with two offline-mode bot players (Minecraft 1.21.11) and three Paper 1.21.11 backends (two hubs, one limbo): balanced initial joins, kick fallback to the other hub, `/hub`, a slash-server command into limbo with waiting titles and automatic exit, allowed and blocked backend `Connect` messages (Velocity with `bungee-plugin-message-channel = false`), a hub outage sending kicked players to limbo and back once a hub is free, `/flowgate status`, plus enable, health pings, `reload`, MOTD/hover and clean shutdown. High player counts were not load-tested.
 
 **Java:** 17+ bytecode; the proxy decides the runtime (Velocity 4 needs 25).
 

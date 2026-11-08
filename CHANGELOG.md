@@ -7,7 +7,7 @@
 - Fix: version shown in the startup log and `/flowgate status` now comes from the plugin metadata instead of a hard-coded string.
 - Build: Gradle 9.8.2 (official wrapper checksum), JDK 25 toolchain emitting Java 17 bytecode, BungeeCord API 1.21-R0.4 (latest stable), Velocity API 4.3.1, JUnit 6.1.3, Mockito 5.24.0. Nothing is shaded.
 
-Validation: 19 unit tests (including Velocity listener, plugin-message and config-merge tests). Smoke-tested on BungeeCord build 2111, Waterfall build 615, Velocity 4.3.1 build 45 (Java 25) and Velocity 3.4.0 build 566 (Java 17): enable, backend health pings, status/reload, server-list MOTD and hover, and clean shutdown. Adventure call sites were checked against Velocity 3.4's bundled Adventure. Routing real players through each proxy and FlameCord/Velocity forks individually were not tested.
+Validation: 19 unit tests (including Velocity listener, plugin-message and config-merge tests). Tested with bot players (1.21.11) and Paper 1.21.11 backends on BungeeCord build 2111, Waterfall build 615, Velocity 4.3.1 build 45 (Java 25) and Velocity 3.4.0 build 566 (Java 17): balanced joins, kick fallback, `/hub`, slash-server to limbo with titles and auto-exit, allowed/blocked backend `Connect` messages, hub outage to limbo and back, status/reload, MOTD/hover, clean shutdown. Adventure call sites were checked against Velocity 3.4's bundled Adventure. Not tested: high player counts, FlameCord and Velocity forks individually.
 
 # 1.0.7 — 2026-10-16
 

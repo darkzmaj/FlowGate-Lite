@@ -1,14 +1,14 @@
-## Maintenance release 1.0.7
+## 1.1.0 (unreleased) — one JAR for BungeeCord and Velocity
 
-Use a maintained **BungeeCord build 2104 or newer** for Minecraft Java 26.3 (protocol 777). Tested on Java 21. Plugin bytecode remains Java 17; follow your proxy's runtime requirement. Waterfall is discontinued and is only a legacy, untested target: do not use it to claim 26.3 support. FlowGate Lite remains a Bungee API plugin; Velocity requires migration to an equivalent router and cannot load this JAR.
+The same `FlowGate-Lite-1.1.0.jar` loads on **BungeeCord and its forks** (Waterfall, FlameCord and other BungeeCord API forks) and on **Velocity 3.4+ / 4.x and its forks**. Plugin bytecode is Java 17; run it on whatever Java your proxy needs (Velocity 4 requires Java 25). Nothing is shaded: both proxy families already ship the SnakeYAML used for configuration.
 
-Existing configuration and the backend `BungeeCord` / `Connect` wire format are preserved. All routes now honor Bungee restricted-server access. Backend servers are trusted infrastructure: firewall them from direct client access, and narrow `plugin-messages.allowed-source-servers` where practical. This plugin forwards connections, never privileged console commands.
+Existing configuration and the backend `BungeeCord` / `Connect` wire format are preserved. BungeeCord routes honor restricted-server access. Backend servers are trusted infrastructure: firewall them from direct client access, and narrow `plugin-messages.allowed-source-servers` where practical. This plugin forwards connections, never privileged console commands.
 
-Build with JDK 25: `bash gradlew clean build`. Output: `build/libs/FlowGate-Lite-1.0.7.jar`. See [CHANGELOG.md](CHANGELOG.md) for fixes and validation limits.
+Build with JDK 25 (needed to read the Velocity 4 API; Gradle finds an installed JDK 25 through its toolchain support): `bash gradlew clean build`. Output: `build/libs/FlowGate-Lite-1.1.0.jar`. See [CHANGELOG.md](CHANGELOG.md) for changes and validation limits.
 
 # FlowGate-Lite
 
-**FlowGate-Lite** is a production-grade BungeeCord proxy plugin for intelligent hub routing, backend health monitoring, automatic failover, and controlled player distribution across Minecraft server networks.
+**FlowGate-Lite** is a production-grade proxy plugin for BungeeCord, Velocity and their forks, for intelligent hub routing, backend health monitoring, automatic failover, and controlled player distribution across Minecraft server networks.
 
 > **FlowGate** is the ecosystem name. **FlowGate-Lite** is this specific plugin. Additional plugins may be released under the FlowGate ecosystem in the future.
 
@@ -16,7 +16,7 @@ Build with JDK 25: `bash gradlew clean build`. Output: `build/libs/FlowGate-Lite
 
 ## Overview
 
-FlowGate-Lite replaces the default BungeeCord server selection logic with a health-aware routing layer. Instead of blindly sending players to whatever server the proxy configuration lists first, it actively monitors backend availability, quarantines failing servers, and selects the best destination based on configurable criteria.
+FlowGate-Lite replaces the proxy's default server selection logic with a health-aware routing layer. Instead of blindly sending players to whatever server the proxy configuration lists first, it actively monitors backend availability, quarantines failing servers, and selects the best destination based on configurable criteria.
 
 Players who cannot be routed (all hubs offline or full) are held in a configurable limbo server and automatically moved out as soon as a hub becomes available again — no reconnect required.
 
@@ -32,7 +32,7 @@ Players who cannot be routed (all hubs offline or full) are held in a configurab
 - **Limbo / fallback system** – players land in a waiting server when all hubs are unavailable
 - **Automatic limbo exit** – scheduler continuously routes limbo players to hubs as they recover
 - **Kick-based fallback** – players kicked from any backend are caught and rerouted automatically
-- **Plugin message security** – BungeeCord channel messages are validated and rate-limited per-player
+- **Plugin message security** – backend `BungeeCord` channel messages are validated and rate-limited per-player
 - **Per-server metrics** – routing success/failure, ping failures, quarantine counts tracked in memory
 - **Live status command** – `/flowgate status` shows current health state and metrics
 - **Hot reload** – `/flowgate reload` applies config changes without a full restart
@@ -65,7 +65,7 @@ The `PlayerSession` stores per-player state (connection state, retry count, last
 
 ### Limbo Loop
 
-A BungeeCord `ScheduledTask` ticks every `check-interval-seconds`. For each player in the limbo set, it:
+A proxy scheduler task ticks every `check-interval-seconds`. For each player in the limbo set, it:
 
 1. Verifies they are still connected and still on the fallback server.
 2. Checks the retry cooldown.
@@ -81,15 +81,15 @@ On disable, the plugin cancels the limbo task, shuts down the health monitor exe
 
 ## Installation
 
-1. Drop `FlowGate-Lite-1.0.7.jar` into your proxy's `plugins/` directory.
+1. Drop `FlowGate-Lite-1.1.0.jar` into your proxy's `plugins/` directory (the same JAR on BungeeCord and Velocity).
 2. Restart the proxy. Config files are generated automatically.
-3. Edit `plugins/FlowGate-Lite/config.yml` with your server names.
+3. Edit `config.yml` with your server names: `plugins/FlowGate-Lite/` on BungeeCord-family proxies, `plugins/flowgate-lite/` on Velocity.
 4. Edit `plugins/FlowGate-Lite/messages.yml` and `motd.yml` as needed.
 5. Run `/flowgate reload` or restart.
 
 **Requirements:**
-- Java 17 or newer
-- BungeeCord build 2104 for Minecraft 26.3; Waterfall/FlameCord are untested legacy forks
+- Java 17 or newer (or newer if your proxy requires it; Velocity 4 needs Java 25)
+- BungeeCord (or a fork such as Waterfall/FlameCord), or Velocity 3.4+ / 4.x (or a fork)
 
 ---
 
@@ -189,6 +189,8 @@ Sticky assignments are intentionally not persisted across proxy reconnects. This
 
 Backend `BungeeCord:Connect` messages may target configured hubs and the fallback server by default. To allow other destinations or restrict which backend servers may issue them, configure `plugin-messages.allowed-connect-servers` and `plugin-messages.allowed-source-servers`.
 
+**Velocity:** Velocity answers `BungeeCord`-channel messages itself while `bungee-plugin-message-channel = true` in `velocity.toml`, so FlowGate's destination, source, rate and hub-capacity policy cannot apply to them. Set it to `false` to have FlowGate handle backend `Connect` messages with that policy. FlowGate implements only `Connect`; other BungeeCord subchannels (`PlayerCount`, `Forward`, …) are then dropped, so keep Velocity's handler on if backend plugins rely on them. Client-sent `BungeeCord` messages are always dropped. Velocity has no restricted-server flag, so restricted-access checks apply on BungeeCord only.
+
 ---
 
 ## Weighted Balancing
@@ -206,7 +208,7 @@ The router computes a score of `playerCount / weight`. A server with weight 3 wi
 ## Troubleshooting
 
 **Players get kicked instead of being rerouted**
-: Check that `fallback.fallback-server` matches a server name registered in BungeeCord. Ensure the fallback server is running.
+: Check that `fallback.fallback-server` matches a server name registered in the proxy. Ensure the fallback server is running.
 
 **Hubs are quarantined frequently**
 : Increase `quarantine-threshold` if backends are slow to respond. Check network latency between proxy and backends. A threshold of 5 is reasonable for high-latency links.
@@ -226,7 +228,7 @@ The router computes a score of `playerCount / weight`. A server with weight 3 wi
 - Use `reserved-slots` to maintain operator access headroom during full load.
 - Enable `sticky-sessions` only if your game design benefits from player-hub affinity.
 - Run the limbo server on a minimal server implementation (e.g., NanoLimbo) to reduce overhead.
-- Avoid setting `hub-max-players` higher than the actual server can handle — let BungeeCord's own limits act as a secondary backstop.
+- Avoid setting `hub-max-players` higher than the actual server can handle — let the proxy's own limits act as a secondary backstop.
 
 ---
 
@@ -234,12 +236,16 @@ The router computes a score of `playerCount / weight`. A server with weight 3 wi
 
 | Platform | Status |
 |----------|--------|
-| BungeeCord | Verified: build 2104, protocol 777 / MC 26.3 |
-| Waterfall | Discontinued; legacy only, untested |
-| FlameCord | Untested legacy fork |
-| Velocity | ✗ Not compatible (different API) |
+| BungeeCord | ✓ Smoke-tested on build 2111 (MC 26.x) |
+| Waterfall | ✓ Smoke-tested on build 615 (26.1); upstream is discontinued |
+| FlameCord and other BungeeCord API forks | ✓ Expected (same API and `bungee.yml` loading); not individually tested |
+| Velocity 4.x | ✓ Smoke-tested on 4.3.1 build 45 (Java 25) |
+| Velocity 3.4+ | ✓ Smoke-tested on 3.4.0 build 566 (Java 17) |
+| Velocity forks keeping the Velocity plugin API | ✓ Expected; not individually tested |
 
-**Java:** 17+
+Smoke tests cover plugin enable, backend health pings, `/flowgate status` and `reload`, server-list MOTD/hover and clean shutdown. Routing real players through each proxy was not repeated for 1.1.0; the routing paths are covered by unit tests.
+
+**Java:** 17+ bytecode; the proxy decides the runtime (Velocity 4 needs 25).
 
 ---
 
@@ -248,9 +254,9 @@ The router computes a score of `playerCount / weight`. A server with weight 3 wi
 | Name | Role |
 |------|------|
 | **FlowGate** | Ecosystem name. Used in package paths and branding. |
-| **FlowGate-Lite** | This plugin. Lightweight proxy routing for BungeeCord networks. |
+| **FlowGate-Lite** | This plugin. Lightweight proxy routing for BungeeCord and Velocity networks. |
 
-Future plugins under the FlowGate ecosystem may include advanced cross-proxy coordination, metrics exporters, or Velocity support.
+Future plugins under the FlowGate ecosystem may include advanced cross-proxy coordination or metrics exporters.
 
 ---
 

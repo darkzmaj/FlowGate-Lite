@@ -3,62 +3,66 @@ plugins {
 }
 
 group = 'si.terona'
-version = '1.0.7'
+version = '1.1.0'
 
+// Velocity 4 API classes are Java 25 bytecode, so compile with JDK 25 while still
+// emitting Java 17 bytecode for BungeeCord/Waterfall and Velocity 3 proxies.
 java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
+    toolchain { languageVersion = JavaLanguageVersion.of(25) }
 }
 
 tasks.withType(JavaCompile).configureEach {
     options.release = 17
+    options.encoding = 'UTF-8'
+    options.compilerArgs += ['-Xlint:deprecation', '-Xlint:unchecked']
 }
 
 repositories {
     mavenCentral()
-
     maven {
-        name = "md5-repo"
-        url = "https://repo.md-5.net/content/repositories/releases/"
+        name = "papermc"
+        url = "https://repo.papermc.io/repository/maven-public/"
     }
-
-    maven {
-        name = "sonatype"
-        url = "https://oss.sonatype.org/content/repositories/snapshots/"
-    }
-
     maven {
         name = "minecraft-libraries"
         url = "https://libraries.minecraft.net/"
     }
 }
 
+// Platform APIs (and the SnakeYAML both proxies ship) are provided at runtime; nothing is shaded.
 dependencies {
     compileOnly 'net.md-5:bungeecord-api:1.21-R0.4'
+    compileOnly 'com.velocitypowered:velocity-api:4.3.1'
+
+    testImplementation 'net.md-5:bungeecord-api:1.21-R0.4'
+    testImplementation 'com.velocitypowered:velocity-api:4.3.1'
+    testImplementation 'org.junit.jupiter:junit-jupiter:6.1.3'
+    testImplementation 'org.mockito:mockito-core:5.24.0'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
+
+// velocity-api 4.x declares JVM 25; resolve it as such while emitting Java 17 bytecode.
+// Only API members that are identical in Velocity 3.x are used, so one jar serves both.
+['compileClasspath', 'testCompileClasspath', 'testRuntimeClasspath'].each { name ->
+    configurations.named(name) {
+        attributes { attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, 25) }
+    }
+}
+
+test { useJUnitPlatform() }
 
 jar {
     archiveBaseName.set("FlowGate-Lite")
     archiveVersion.set(project.version.toString())
 }
 
-// Platform APIs are provided by the proxy; tests use the same API without shading it.
-dependencies {
-    testImplementation 'net.md-5:bungeecord-api:1.21-R0.4'
-    testImplementation 'org.junit.jupiter:junit-jupiter:5.14.1'
-    testImplementation 'org.mockito:mockito-core:5.20.0'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-}
-test { useJUnitPlatform() }
 def pluginVersion = project.version.toString()
 processResources {
     inputs.property 'version', pluginVersion
-    filesMatching('bungee.yml') { expand(version: pluginVersion) }
+    filesMatching(['bungee.yml', 'velocity-plugin.json']) { expand(version: pluginVersion) }
 }
+
 tasks.withType(AbstractArchiveTask).configureEach {
     preserveFileTimestamps = false
     reproducibleFileOrder = true
 }
-tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
-
-tasks.withType(JavaCompile).configureEach { options.compilerArgs += ['-Xlint:deprecation', '-Xlint:unchecked'] }

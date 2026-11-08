@@ -1,8 +1,8 @@
 # FlowGate-Lite | config.yml
-# Plugin: FlowGate-Lite  |  Version: 1.0.6
+# Plugin: FlowGate-Lite  |  Version: 1.1.0
 # https://github.com/terona-studios/FlowGate
 #
-# Hub and fallback servers MUST exist in your BungeeCord config.
+# Hub and fallback servers MUST exist in your proxy config (BungeeCord config.yml or velocity.toml).
 # /flowgate reload applies most changes without a full restart.
 # Server list changes (hubs / fallback) require a proxy restart.
 
@@ -13,7 +13,7 @@ titles:
   enabled: true
 
 # Hub servers the router distributes players across.
-# Names must match entries in BungeeCord's config.yml.
+# Names must match servers defined in the proxy config.
 hubs:
   - servername1
   - servername2
@@ -64,7 +64,7 @@ slash-servers:
   anarchy: anarchy-server
   dev: dev-server
 
-# Policy for backend BungeeCord Connect plugin messages.
+# Policy for backend BungeeCord-channel Connect plugin messages (on Velocity see README: bungee-plugin-message-channel).
 # Empty destination list permits only configured hubs and the fallback server.
 # Empty source list permits messages from any backend registered on this proxy.
 plugin-messages:

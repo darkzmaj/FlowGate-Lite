@@ -12,8 +12,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
 
-import net.md_5.bungee.api.ProxyServer;
-import net.md_5.bungee.api.config.ServerInfo;
 import si.terona.flowgate.config.PluginConfig;
 import si.terona.flowgate.model.ServerHealth;
 
@@ -22,6 +20,7 @@ public final class HealthMonitorService {
     private final Logger logger;
     private volatile PluginConfig config;
     private final MetricsService metrics;
+    private final ProxyPlatform platform;
 
     private final ConcurrentHashMap<String, ServerHealth> healthCache = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, AtomicInteger> failureCounters = new ConcurrentHashMap<>();
@@ -30,8 +29,9 @@ public final class HealthMonitorService {
     private ScheduledExecutorService scheduler;
     private final AtomicLong generation = new AtomicLong(0L);
 
-    public HealthMonitorService(Logger logger, PluginConfig config, MetricsService metrics) {
+    public HealthMonitorService(Logger logger, PluginConfig config, MetricsService metrics, ProxyPlatform platform) {
         this.logger  = logger;
+        this.platform = platform;
         this.config  = config;
         this.metrics = metrics;
     }
@@ -92,8 +92,7 @@ public final class HealthMonitorService {
             for (String serverName : servers) {
                 if (Thread.currentThread().isInterrupted()) break;
 
-                ServerInfo info = ProxyServer.getInstance().getServerInfo(serverName);
-                if (info == null) {
+                if (!platform.hasServer(serverName)) {
                     healthCache.put(serverName, ServerHealth.offline(serverName, getFailureCount(serverName)));
                     continue;
                 }
@@ -106,13 +105,13 @@ public final class HealthMonitorService {
                 final String name = serverName;
                 if (inFlightProbes.putIfAbsent(name, cycleGeneration) != null) continue;
                 final long start = System.currentTimeMillis();
-                info.ping((result, error) -> {
+                platform.ping(name, answered -> {
                     inFlightProbes.remove(name, cycleGeneration);
                     if (generation.get() != cycleGeneration) return;
-                    if (error != null || result == null) {
-                        handleFailure(name);
-                    } else {
+                    if (answered) {
                         handleSuccess(name, System.currentTimeMillis() - start);
+                    } else {
+                        handleFailure(name);
                     }
                 });
             }

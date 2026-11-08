@@ -9,9 +9,9 @@ import net.md_5.bungee.api.event.PluginMessageEvent;
 import net.md_5.bungee.api.plugin.Listener;
 import net.md_5.bungee.event.EventHandler;
 import si.terona.flowgate.FlowGate;
+import si.terona.flowgate.service.MessageRateLimiter;
 
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Intercepts BungeeCord plugin-channel messages originating from backend servers.
@@ -28,7 +28,7 @@ public final class PluginMessageListener implements Listener {
     private static final int RATE_LIMIT_PER_SECOND = 10;
 
     private final FlowGate plugin;
-    private final ConcurrentHashMap<UUID, RateWindow> rateWindows = new ConcurrentHashMap<>();
+    private final MessageRateLimiter rateLimiter = new MessageRateLimiter(RATE_LIMIT_PER_SECOND);
 
     public PluginMessageListener(FlowGate plugin) {
         this.plugin = plugin;
@@ -92,7 +92,7 @@ public final class PluginMessageListener implements Listener {
         }
 
         if (plugin.getRouterService().isHub(targetServerName)
-                && !plugin.getRouterService().reserveHub(player, targetServerName)) {
+                && !plugin.getRouterService().reserveHub(player.getUniqueId(), targetServerName)) {
             plugin.debug("Plugin message blocked: hub unavailable or full '" + targetServerName + "'");
             event.setCancelled(true);
             return;
@@ -104,22 +104,7 @@ public final class PluginMessageListener implements Listener {
 
     // Rate limiting
 
-    private boolean isRateLimited(UUID playerId) {
-        return rateWindows.computeIfAbsent(playerId, id -> new RateWindow()).limited();
-    }
+    private boolean isRateLimited(UUID playerId) { return rateLimiter.limited(playerId); }
 
-    public void removeRateLimit(UUID playerId) { rateWindows.remove(playerId); }
-
-    private static final class RateWindow {
-        private long start = System.nanoTime();
-        private int count;
-        synchronized boolean limited() {
-            long now = System.nanoTime();
-            if (now - start >= java.util.concurrent.TimeUnit.SECONDS.toNanos(1)) {
-                start = now;
-                count = 0;
-            }
-            return ++count > RATE_LIMIT_PER_SECOND;
-        }
-    }
+    public void removeRateLimit(UUID playerId) { rateLimiter.remove(playerId); }
 }

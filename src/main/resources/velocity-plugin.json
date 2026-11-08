@@ -1,0 +1,10 @@
+{
+  "id": "flowgate-lite",
+  "name": "FlowGate-Lite",
+  "version": "${version}",
+  "description": "Hub load balancing, health-checked routing and limbo fallback for proxies.",
+  "url": "https://github.com/Terona-Studios/FlowGate-Lite",
+  "authors": ["Terona Studios"],
+  "dependencies": [],
+  "main": "si.terona.flowgate.velocity.FlowGateVelocity"
+}

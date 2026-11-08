@@ -1,6 +1,6 @@
 package si.terona.flowgate.config;
 
-import net.md_5.bungee.config.Configuration;
+
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -11,7 +11,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * Typed, immutable wrapper around the raw BungeeCord {@link Configuration}.
+ * Typed, immutable wrapper around the raw {@link YamlConfig}.
  * All values are read once at construction time with safe defaults.
  */
 public final class PluginConfig {
@@ -34,7 +34,7 @@ public final class PluginConfig {
     private final Set<String> pluginMessageAllowedConnectServers;
     private final Set<String> pluginMessageAllowedSourceServers;
 
-    public PluginConfig(Configuration cfg) {
+    public PluginConfig(YamlConfig cfg) {
         List<String> hubs = cfg.getStringList("hubs");
         this.hubServers = hubs != null
                 ? Collections.unmodifiableList(new ArrayList<>(hubs))
@@ -56,7 +56,7 @@ public final class PluginConfig {
         this.stickySessionTtlMs   = clampL(cfg.getLong("routing.sticky-session-ttl-ms", 300_000L), 10_000L, 3_600_000L);
 
         Map<String, Integer> weights = new HashMap<>();
-        if (cfg.get("server-weights") instanceof Configuration) {
+        if (cfg.get("server-weights") instanceof YamlConfig) {
             for (String server : cfg.getSection("server-weights").getKeys()) {
                 int w = cfg.getInt("server-weights." + server, 1);
                 weights.put(server.toLowerCase(java.util.Locale.ROOT), clamp(w, 1, 1000));

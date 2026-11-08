@@ -1,3 +1,14 @@
+# 1.1.0 — unreleased
+
+- One universal JAR: the same file now loads on BungeeCord-family proxies (BungeeCord, Waterfall, FlameCord and other BungeeCord API forks) and on Velocity 3.4+ / 4.x and Velocity forks.
+- Velocity support: health-checked hub routing for initial joins, kick fallback/limbo, limbo auto-exit, `/flowgate reload|status` (with tab completion), hub and slash-server commands, waiting titles, MOTD/hover profiles (hex colours) and policy-checked backend `Connect` messages when Velocity's own `bungee-plugin-message-channel` is disabled. Client-sent `BungeeCord` channel messages are dropped on Velocity.
+- Routing core (config, health monitor, router, sessions, rate limiter) is now platform-neutral; behaviour and configuration keys are unchanged.
+- Fix: deleted example entries in `slash-servers`, `server-weights`, `server-names` and `motds` no longer reappear when defaults are merged.
+- Fix: version shown in the startup log and `/flowgate status` now comes from the plugin metadata instead of a hard-coded string.
+- Build: Gradle 9.8.2 (official wrapper checksum), JDK 25 toolchain emitting Java 17 bytecode, BungeeCord API 1.21-R0.4 (latest stable), Velocity API 4.3.1, JUnit 6.1.3, Mockito 5.24.0. Nothing is shaded.
+
+Validation: 19 unit tests (including Velocity listener, plugin-message and config-merge tests). Smoke-tested on BungeeCord build 2111, Waterfall build 615, Velocity 4.3.1 build 45 (Java 25) and Velocity 3.4.0 build 566 (Java 17): enable, backend health pings, status/reload, server-list MOTD and hover, and clean shutdown. Adventure call sites were checked against Velocity 3.4's bundled Adventure. Routing real players through each proxy and FlameCord/Velocity forks individually were not tested.
+
 # 1.0.7 — 2026-10-16
 
 - Fix limbo completion by observing ServerSwitchEvent after the active server changes.

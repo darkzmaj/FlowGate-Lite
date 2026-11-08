@@ -6,8 +6,8 @@ import net.md_5.bungee.api.chat.BaseComponent;
 import net.md_5.bungee.api.chat.TextComponent;
 import net.md_5.bungee.api.connection.ProxiedPlayer;
 import net.md_5.bungee.api.scheduler.ScheduledTask;
-import net.md_5.bungee.config.Configuration;
 import si.terona.flowgate.FlowGate;
+import si.terona.flowgate.config.YamlConfig;
 
 import java.util.HashSet;
 import java.util.List;
@@ -94,7 +94,7 @@ public final class TitleManager {
         if (plugin == null) return;
 
         String fallbackName = plugin.getPluginConfig().getFallbackServer();
-        Configuration messages = plugin.getMessages();
+        YamlConfig messages = plugin.getMessages();
         if (messages == null) return;
 
         for (UUID uuid : new HashSet<>(ACTIVE)) {
@@ -118,7 +118,7 @@ public final class TitleManager {
         }
     }
 
-    private static void sendFrame(ProxiedPlayer player, UUID uuid, Configuration messages) {
+    private static void sendFrame(ProxiedPlayer player, UUID uuid, YamlConfig messages) {
         List<String> frames = messages.getStringList("titles.waiting.animation");
         if (frames.isEmpty()) return;
 

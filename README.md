@@ -43,9 +43,7 @@ Once a day FlowGate Lite tells kori.my that one more server runs it: an anonymou
 
 [![Join our Discord: darkzmaj.eu/discord](https://kori.my/assets/img/brand/discord-banner.png)](https://darkzmaj.eu/discord)
 
-![© 2026 DarkZmaj · KORI Network](https://kori.my/assets/img/brand/copyright.png)
-
-Free to use, with the source code on GitHub. Made by DarkZmaj for KORI Network.
+Free and open source under the MIT licence. Made by DarkZmaj for KORI Network.
 
 ## For developers
 
@@ -54,5 +52,3 @@ Build with JDK 25 (needed to read the Velocity 4 API; Gradle finds an installed 
 The **Publish release JAR** workflow runs for new `vMAJOR.MINOR.PATCH` tags. To attach assets to an existing release, run it manually from `main` with the exact version tag (for example `v1.0.7`). It checks out the resolved tag commit, uses Java 25, runs `clean build` and existing tests, validates plugin metadata and bytecode, and preserves the JAR as an Actions artifact before publishing. The build has read-only repository access; only the separate publishing job has `contents: write`. Existing assets are compared and never overwritten. The audited release tag and original JAR checksum are pinned for v1.0.7; a mismatch stops publication.
 
 Repository Actions must be enabled and permit the workflow's `GITHUB_TOKEN` to request `contents: write` (organization policy must permit it). No personal access token is required. No tag or release needs to be deleted or recreated. See the release notes ([1.0.8](docs/releases/v1.0.8.md), [1.0.7](docs/releases/v1.0.7.md)) for verified platforms and limitations.
-
-© Terona Studios. All rights reserved.

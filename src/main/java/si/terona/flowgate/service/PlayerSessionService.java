@@ -1,6 +1,5 @@
 package si.terona.flowgate.service;
 
-import net.md_5.bungee.api.connection.ProxiedPlayer;
 import si.terona.flowgate.config.PluginConfig;
 import si.terona.flowgate.model.ConnectionState;
 import si.terona.flowgate.model.PlayerSession;
@@ -19,11 +18,8 @@ public final class PlayerSessionService {
 
     // Session access
 
-    public PlayerSession getOrCreate(ProxiedPlayer player) {
-        return sessions.computeIfAbsent(
-                player.getUniqueId(),
-                id -> new PlayerSession(id, player.getName())
-        );
+    public PlayerSession getOrCreate(UUID playerId, String playerName) {
+        return sessions.computeIfAbsent(playerId, id -> new PlayerSession(id, playerName));
     }
 
     public PlayerSession get(UUID playerId) {
@@ -68,8 +64,8 @@ public final class PlayerSessionService {
         return sessions.size();
     }
 
-    public void markLimbo(ProxiedPlayer player) {
-        getOrCreate(player).setState(ConnectionState.LIMBO);
+    public void markLimbo(UUID playerId, String playerName) {
+        getOrCreate(playerId, playerName).setState(ConnectionState.LIMBO);
     }
 
     public void markConnected(UUID playerId, String serverName) {

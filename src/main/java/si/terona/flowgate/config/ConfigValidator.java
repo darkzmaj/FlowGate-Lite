@@ -1,7 +1,7 @@
 package si.terona.flowgate.config;
 
-import net.md_5.bungee.api.ProxyServer;
-import net.md_5.bungee.config.Configuration;
+import java.util.function.Predicate;
+
 
 import java.util.ArrayList;
 import java.util.List;
@@ -15,13 +15,13 @@ public final class ConfigValidator {
     private ConfigValidator() {}
 
     /**
-     * Validates the given {@link Configuration} against the proxy's registered server list.
+     * Validates the given configuration against the proxy's registered server list.
      *
      * @param config the loaded plugin configuration
-     * @param proxy  the proxy server instance
+     * @param serverExists whether a server name is registered in the proxy
      * @return a list of validation error messages. Empty if config is valid.
      */
-    public static List<String> validate(Configuration config, ProxyServer proxy) {
+    public static List<String> validate(YamlConfig config, Predicate<String> serverExists) {
         List<String> errors = new ArrayList<>();
 
         // Hubs
@@ -31,7 +31,7 @@ public final class ConfigValidator {
             for (String hub : config.getStringList("hubs")) {
                 if (hub == null || hub.trim().isEmpty()) {
                     errors.add("'hubs' contains a blank entry");
-                } else if (proxy.getServerInfo(hub) == null) {
+                } else if (!serverExists.test(hub)) {
                     errors.add("Hub server '" + hub + "' is not registered in the proxy config");
                 }
             }
@@ -45,7 +45,7 @@ public final class ConfigValidator {
                 String fallback = config.getString("fallback.fallback-server", "");
                 if (fallback.isEmpty()) {
                     errors.add("'fallback.fallback-server' must not be empty");
-                } else if (proxy.getServerInfo(fallback) == null) {
+                } else if (!serverExists.test(fallback)) {
                     errors.add("Fallback server '" + fallback + "' is not registered in the proxy config");
                 }
             }
@@ -85,14 +85,14 @@ public final class ConfigValidator {
 
         // Slash servers: validate referenced servers exist
         if (config.contains("slash-servers")) {
-            if (!(config.get("slash-servers") instanceof Configuration)) {
+            if (!(config.get("slash-servers") instanceof YamlConfig)) {
                 errors.add("'slash-servers' must be a section");
             } else {
             for (String cmd : config.getSection("slash-servers").getKeys()) {
                 String target = config.getString("slash-servers." + cmd, "");
                 if (target.isEmpty()) {
                     errors.add("slash-server '/" + cmd + "' has an empty target server");
-                } else if (proxy.getServerInfo(target) == null) {
+                } else if (!serverExists.test(target)) {
                     errors.add("slash-server '/" + cmd + "' → server '" + target
                             + "' is not registered in the proxy config (will be skipped)");
                 }
@@ -100,7 +100,7 @@ public final class ConfigValidator {
             }
         }
 
-        if (config.contains("server-weights") && !(config.get("server-weights") instanceof Configuration)) {
+        if (config.contains("server-weights") && !(config.get("server-weights") instanceof YamlConfig)) {
             errors.add("'server-weights' must be a section");
         }
         validateStringList(config, "plugin-messages.allowed-connect-servers", errors);
@@ -109,13 +109,13 @@ public final class ConfigValidator {
         return errors;
     }
 
-    private static void validateBoolean(Configuration config, String key, List<String> errors) {
+    private static void validateBoolean(YamlConfig config, String key, List<String> errors) {
         if (config.contains(key) && !(config.get(key) instanceof Boolean)) {
             errors.add("'" + key + "' must be true or false, got: " + config.get(key));
         }
     }
 
-    private static void validateStringList(Configuration config, String key, List<String> errors) {
+    private static void validateStringList(YamlConfig config, String key, List<String> errors) {
         if (config.contains(key) && !(config.get(key) instanceof List)) {
             errors.add("'" + key + "' must be a list of server names");
         }

@@ -35,7 +35,7 @@ public final class LimboRouterListener implements Listener {
         UUID uuid = player.getUniqueId();
         if (!plugin.getSearchingPlayers().add(uuid)) return;
 
-        PlayerSession session = plugin.getPlayerSessionService().getOrCreate(player);
+        PlayerSession session = plugin.getPlayerSessionService().getOrCreate(uuid, player.getName());
         session.setState(ConnectionState.LIMBO);
 
         if (plugin.getPluginConfig().isTitlesEnabled()) TitleManager.start(player);

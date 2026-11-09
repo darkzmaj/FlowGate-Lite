@@ -28,8 +28,8 @@ public final class ServerConnectBlockerListener implements Listener {
         ProxiedPlayer player = event.getPlayer();
         if (player == null || event.getTarget() == null) return;
 
-        RoutingResult result = plugin.getRouterService().reserveBestHub(
-                player, plugin.getPlayerSessionService().getOrCreate(player));
+        RoutingResult result = plugin.getRouterService().reserveBestHub(player.getUniqueId(), null,
+                plugin.getPlayerSessionService().getOrCreate(player.getUniqueId(), player.getName()));
         if (result.isSuccess()) {
             ServerInfo hub = plugin.getProxy().getServerInfo(result.getServerName());
             if (hub != null && !hub.getName().equalsIgnoreCase(event.getTarget().getName())) {
@@ -37,13 +37,13 @@ public final class ServerConnectBlockerListener implements Listener {
                 plugin.debug("JOIN_PROXY -> " + hub.getName() + " [" + player.getName() + "]");
             }
         } else if (plugin.getPluginConfig().isFallbackEnabled()) {
-            RoutingResult limbo = plugin.getRouterService().routeToLimbo(player);
+            RoutingResult limbo = plugin.getRouterService().routeToLimbo(player.getUniqueId(), null);
             if (limbo.isSuccess()) {
                 ServerInfo limboServer = plugin.getProxy().getServerInfo(limbo.getServerName());
                 if (limboServer != null) {
                     event.setTarget(limboServer);
                     plugin.getSearchingPlayers().add(player.getUniqueId());
-                    plugin.getPlayerSessionService().getOrCreate(player)
+                    plugin.getPlayerSessionService().getOrCreate(player.getUniqueId(), player.getName())
                             .setState(ConnectionState.LIMBO);
                     if (plugin.getPluginConfig().isTitlesEnabled()) TitleManager.start(player);
                     plugin.debug("JOIN_PROXY -> limbo [" + player.getName() + "]");

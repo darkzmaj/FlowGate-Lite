@@ -7,6 +7,7 @@ import net.md_5.bungee.api.chat.TextComponent;
 import net.md_5.bungee.api.config.ServerInfo;
 import net.md_5.bungee.api.connection.ProxiedPlayer;
 import net.md_5.bungee.api.plugin.Command;
+import si.terona.flowgate.BungeePlatform;
 import si.terona.flowgate.FlowGate;
 import si.terona.flowgate.model.RoutingResult;
 import si.terona.flowgate.model.PlayerSession;
@@ -31,13 +32,14 @@ public final class HubCommand extends Command {
         if (!player.isConnected()) return;
 
         // Find best hub using cached health – no pings
-        PlayerSession session = plugin.getPlayerSessionService().getOrCreate(player);
-        RoutingResult result = plugin.getRouterService().reserveBestHub(player, session);
+        PlayerSession session = plugin.getPlayerSessionService().getOrCreate(player.getUniqueId(), player.getName());
+        String current = BungeePlatform.currentServer(player);
+        RoutingResult result = plugin.getRouterService().reserveBestHub(player.getUniqueId(), current, session);
 
         if (!result.isSuccess()) {
             // All hubs unavailable – try limbo as last resort
             if (plugin.getPluginConfig().isFallbackEnabled()) {
-                RoutingResult limbo = plugin.getRouterService().routeToLimbo(player);
+                RoutingResult limbo = plugin.getRouterService().routeToLimbo(player.getUniqueId(), current);
                 if (limbo.isSuccess()) {
                     ServerInfo fallback = plugin.getProxy().getServerInfo(limbo.getServerName());
                     if (fallback != null) {

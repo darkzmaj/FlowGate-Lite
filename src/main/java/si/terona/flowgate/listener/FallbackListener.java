@@ -7,6 +7,7 @@ import net.md_5.bungee.api.event.ServerKickEvent;
 import net.md_5.bungee.api.plugin.Listener;
 import net.md_5.bungee.event.EventHandler;
 import net.md_5.bungee.event.EventPriority;
+import si.terona.flowgate.BungeePlatform;
 import si.terona.flowgate.FlowGate;
 import si.terona.flowgate.model.ConnectionState;
 import si.terona.flowgate.model.PlayerSession;
@@ -31,12 +32,12 @@ public final class FallbackListener implements Listener {
         if (plugin.isOnFallback(player)) return;
 
         String kickedFrom = event.getKickedFrom() != null ? event.getKickedFrom().getName() : null;
-        PlayerSession failedSession = plugin.getPlayerSessionService().getOrCreate(player);
+        PlayerSession failedSession = plugin.getPlayerSessionService().getOrCreate(player.getUniqueId(), player.getName());
         if (!failedSession.recordFailedServer(kickedFrom)) {
             plugin.debug("Fallback stopped: repeated rejection by the same backend");
             return;
         }
-        RoutingResult result = plugin.getRouterService().reserveFallback(player, kickedFrom);
+        RoutingResult result = plugin.getRouterService().reserveFallback(player.getUniqueId(), BungeePlatform.currentServer(player), kickedFrom);
 
         if (!result.isSuccess()) {
             plugin.debug("Fallback failed for " + player.getName() + ": " + result.getReason());
@@ -55,7 +56,7 @@ public final class FallbackListener implements Listener {
 
         if (!plugin.getRouterService().isHub(result.getServerName())) {
             if (plugin.getSearchingPlayers().add(player.getUniqueId())) {
-                PlayerSession session = plugin.getPlayerSessionService().getOrCreate(player);
+                PlayerSession session = plugin.getPlayerSessionService().getOrCreate(player.getUniqueId(), player.getName());
                 session.setState(ConnectionState.LIMBO);
                 if (plugin.getPluginConfig().isTitlesEnabled()) TitleManager.start(player);
                 plugin.sendFallbackSearching(player);

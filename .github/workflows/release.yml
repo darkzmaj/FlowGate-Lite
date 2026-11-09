@@ -91,6 +91,8 @@ jobs:
               descriptors = [p for p in ('plugin.yml', 'bungee.yml', 'velocity-plugin.json') if p in entries]
               if not descriptors:
                   raise SystemExit('Missing plugin metadata')
+              if 'bungee.yml' in entries and tuple(map(int, version.split('.'))) >= (1, 0, 8) and 'velocity-plugin.json' not in entries:
+                  raise SystemExit('Universal JAR is missing velocity-plugin.json')
               for descriptor in descriptors:
                   content = archive.read(descriptor).decode('utf-8')
                   if descriptor.endswith('.json'):

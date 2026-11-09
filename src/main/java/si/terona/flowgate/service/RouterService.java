@@ -1,8 +1,5 @@
 package si.terona.flowgate.service;
 
-import net.md_5.bungee.api.ProxyServer;
-import net.md_5.bungee.api.config.ServerInfo;
-import net.md_5.bungee.api.connection.ProxiedPlayer;
 import si.terona.flowgate.config.PluginConfig;
 import si.terona.flowgate.model.PlayerSession;
 import si.terona.flowgate.model.RoutingResult;
@@ -16,29 +13,30 @@ import java.util.UUID;
 public final class RouterService {
 
     private final HealthMonitorService healthMonitor;
+    private final ProxyPlatform platform;
     private volatile PluginConfig config;
     private final Map<UUID, Reservation> reservations = new HashMap<>();
 
     private static final long RESERVATION_TIMEOUT_MS = 15_000L;
 
-    public RouterService(HealthMonitorService healthMonitor, PluginConfig config) {
+    public RouterService(HealthMonitorService healthMonitor, PluginConfig config, ProxyPlatform platform) {
         this.healthMonitor = healthMonitor;
+        this.platform      = platform;
         this.config        = config;
     }
 
     // Routing
 
-    public RoutingResult findBestHub(ProxiedPlayer player) {
-        return findBestHub(player, null);
+    public RoutingResult findBestHub(UUID playerId, String current) {
+        return findBestHub(playerId, current, null);
     }
 
-    public RoutingResult findBestHub(ProxiedPlayer player, PlayerSession session) {
+    public RoutingResult findBestHub(UUID playerId, String current, PlayerSession session) {
         purgeExpiredReservations();
         if (!config.isRoutingEnabled()) {
             return RoutingResult.failure("Routing is disabled");
         }
 
-        String current = currentServerName(player);
         int limit = Math.max(1, config.getHardPlayerLimit() - config.getReservedSlots());
 
         // Sticky session: re-route to last known-good hub if still within TTL and healthy
@@ -49,8 +47,7 @@ public final class RouterService {
                 if (age < config.getStickySessionTtlMs()) {
                     ServerHealth health = healthMonitor.getHealth(sticky);
                     if (health != null && health.isAvailable()) {
-                        ServerInfo info = ProxyServer.getInstance().getServerInfo(sticky);
-                        if (info != null && info.canAccess(player) && getEffectivePlayerCount(info) < limit) {
+                        if (isRoutable(playerId, sticky) && getEffectivePlayerCount(sticky) < limit) {
                             return RoutingResult.success(sticky);
                         }
                     }
@@ -59,7 +56,7 @@ public final class RouterService {
         }
 
         // Weighted least-players selection
-        ServerInfo best = null;
+        String best = null;
         double bestScore = Double.MAX_VALUE;
 
         for (String hubName : config.getHubServers()) {
@@ -68,22 +65,21 @@ public final class RouterService {
             ServerHealth health = healthMonitor.getHealth(hubName);
             if (health == null || !health.isAvailable()) continue;
 
-            ServerInfo info = ProxyServer.getInstance().getServerInfo(hubName);
-            if (info == null || !info.canAccess(player)) continue;
+            if (!isRoutable(playerId, hubName)) continue;
 
-            int count = getEffectivePlayerCount(info);
+            int count = getEffectivePlayerCount(hubName);
             if (count >= limit) continue;
 
             // Lower score = preferred. Weight divides the load, so heavier servers score lower.
             double score = (double) count / config.getServerWeight(hubName);
             if (score < bestScore) {
                 bestScore = score;
-                best = info;
+                best = hubName;
             }
         }
 
         return best != null
-                ? RoutingResult.success(best.getName())
+                ? RoutingResult.success(best)
                 : RoutingResult.failure("No available hubs (all offline, quarantined, or full)");
     }
 
@@ -91,23 +87,22 @@ public final class RouterService {
      * Selects and reserves a hub slot for a pending connection. The reservation is
      * released when the player connects, disconnects, or the connection fails.
      */
-    public synchronized RoutingResult reserveBestHub(ProxiedPlayer player, PlayerSession session) {
-        RoutingResult result = findBestHub(player, session);
+    public synchronized RoutingResult reserveBestHub(UUID playerId, String current, PlayerSession session) {
+        RoutingResult result = findBestHub(playerId, current, session);
         if (result.isSuccess()) {
-            reservations.put(player.getUniqueId(), new Reservation(result.getServerName(), System.currentTimeMillis()));
+            reservations.put(playerId, new Reservation(result.getServerName(), System.currentTimeMillis()));
         }
         return result;
     }
 
-    public synchronized boolean reserveHub(ProxiedPlayer player, String serverName) {
+    public synchronized boolean reserveHub(UUID playerId, String serverName) {
         purgeExpiredReservations();
         if (!isHub(serverName) || !healthMonitor.isHealthy(serverName)) return false;
 
-        ServerInfo info = ProxyServer.getInstance().getServerInfo(serverName);
         int limit = Math.max(1, config.getHardPlayerLimit() - config.getReservedSlots());
-        if (info == null || !info.canAccess(player) || getEffectivePlayerCount(info) >= limit) return false;
+        if (!isRoutable(playerId, serverName) || getEffectivePlayerCount(serverName) >= limit) return false;
 
-        reservations.put(player.getUniqueId(), new Reservation(info.getName(), System.currentTimeMillis()));
+        reservations.put(playerId, new Reservation(serverName, System.currentTimeMillis()));
         return true;
     }
 
@@ -119,13 +114,12 @@ public final class RouterService {
         this.config = config;
     }
 
-    public RoutingResult findFallback(ProxiedPlayer player, String failedServer) {
+    public RoutingResult findFallback(UUID playerId, String current, String failedServer) {
         if (!config.isFallbackEnabled()) {
             return RoutingResult.failure("Fallback is disabled");
         }
 
-        String current = currentServerName(player);
-        ServerInfo best = null;
+        String best = null;
         double bestScore = Double.MAX_VALUE;
         int limit = Math.max(1, config.getHardPlayerLimit() - config.getReservedSlots());
 
@@ -136,48 +130,46 @@ public final class RouterService {
             ServerHealth health = healthMonitor.getHealth(hubName);
             if (health == null || !health.isAvailable()) continue;
 
-            ServerInfo info = ProxyServer.getInstance().getServerInfo(hubName);
-            if (info == null || !info.canAccess(player)) continue;
+            if (!isRoutable(playerId, hubName)) continue;
 
-            int count = getEffectivePlayerCount(info);
+            int count = getEffectivePlayerCount(hubName);
             if (count >= limit) continue;
 
             double score = (double) count / config.getServerWeight(hubName);
             if (score < bestScore) {
                 bestScore = score;
-                best = info;
+                best = hubName;
             }
         }
 
-        if (best != null) return RoutingResult.success(best.getName());
+        if (best != null) return RoutingResult.success(best);
         if (failedServer != null && isFallback(failedServer)) return RoutingResult.failure("Fallback server rejected the connection");
-        return routeToLimbo(player);
+        return routeToLimbo(playerId, current);
     }
 
     /** Selects a failover target and reserves capacity when it is a hub. */
-    public synchronized RoutingResult reserveFallback(ProxiedPlayer player, String failedServer) {
+    public synchronized RoutingResult reserveFallback(UUID playerId, String current, String failedServer) {
         purgeExpiredReservations();
-        RoutingResult result = findFallback(player, failedServer);
+        RoutingResult result = findFallback(playerId, current, failedServer);
         if (result.isSuccess() && isHub(result.getServerName())) {
-            reservations.put(player.getUniqueId(),
+            reservations.put(playerId,
                     new Reservation(result.getServerName(), System.currentTimeMillis()));
         }
         return result;
     }
 
-    public RoutingResult routeToLimbo(ProxiedPlayer player) {
+    public RoutingResult routeToLimbo(UUID playerId, String current) {
         String name = config.getFallbackServer();
         if (name == null || name.isEmpty()) {
             return RoutingResult.failure("No fallback server configured");
         }
-        ServerInfo fallback = ProxyServer.getInstance().getServerInfo(name);
-        if (fallback == null || !fallback.canAccess(player)) {
+        if (!isRoutable(playerId, name)) {
             return RoutingResult.failure("Fallback server '" + name + "' not found in proxy");
         }
-        if (name.equalsIgnoreCase(currentServerName(player))) {
+        if (name.equalsIgnoreCase(current)) {
             return RoutingResult.failure("Player is already on the fallback server");
         }
-        return RoutingResult.success(fallback.getName());
+        return RoutingResult.success(name);
     }
 
     // Queries
@@ -215,16 +207,16 @@ public final class RouterService {
                 || config.getPluginMessageAllowedSourceServers().contains(serverName.toLowerCase(java.util.Locale.ROOT)));
     }
 
-    private static String currentServerName(ProxiedPlayer player) {
-        return player.getServer() != null ? player.getServer().getInfo().getName() : null;
+    private boolean isRoutable(UUID playerId, String serverName) {
+        return platform.hasServer(serverName) && platform.canAccess(playerId, serverName);
     }
 
-    private synchronized int getEffectivePlayerCount(ServerInfo info) {
+    private synchronized int getEffectivePlayerCount(String serverName) {
         int pending = 0;
         for (Reservation reservation : reservations.values()) {
-            if (reservation.serverName.equalsIgnoreCase(info.getName())) pending++;
+            if (reservation.serverName.equalsIgnoreCase(serverName)) pending++;
         }
-        return info.getPlayers().size() + pending;
+        return platform.playerCount(serverName) + pending;
     }
 
     private synchronized void purgeExpiredReservations() {

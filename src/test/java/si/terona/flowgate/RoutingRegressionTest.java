@@ -4,9 +4,9 @@ import net.md_5.bungee.api.ProxyServer;
 import net.md_5.bungee.api.config.ServerInfo;
 import net.md_5.bungee.api.connection.*;
 import net.md_5.bungee.api.event.*;
-import net.md_5.bungee.config.Configuration;
 import org.junit.jupiter.api.Test;
 import si.terona.flowgate.config.PluginConfig;
+import si.terona.flowgate.config.YamlConfig;
 import si.terona.flowgate.listener.*;
 import si.terona.flowgate.service.*;
 import java.util.*;
@@ -60,7 +60,7 @@ class RoutingRegressionTest {
         Locale before = Locale.getDefault();
         try {
             Locale.setDefault(Locale.forLanguageTag("tr-TR"));
-            Configuration raw = new Configuration();
+            YamlConfig raw = new YamlConfig();
             raw.set("plugin-messages.allowed-source-servers", List.of("MINIGAME"));
             PluginConfig cfg = new PluginConfig(raw);
             assertTrue(cfg.getPluginMessageAllowedSourceServers().contains("minigame"));
@@ -89,7 +89,7 @@ class RoutingRegressionTest {
     }
 
     @Test void restrictedHubsCannotBeReservedOrSelectedWithoutAccess() {
-        Configuration raw = new Configuration(); raw.set("hubs", List.of("hub"));
+        YamlConfig raw = new YamlConfig(); raw.set("hubs", List.of("hub"));
         PluginConfig cfg = new PluginConfig(raw);
         HealthMonitorService health = mock(HealthMonitorService.class);
         when(health.getHealth("hub")).thenReturn(si.terona.flowgate.model.ServerHealth.online("hub", 1));
@@ -100,15 +100,14 @@ class RoutingRegressionTest {
         when(hub.getName()).thenReturn("hub");
         when(hub.getPlayers()).thenReturn(List.of());
         ProxiedPlayer player = mock(ProxiedPlayer.class);
-        when(player.getUniqueId()).thenReturn(UUID.randomUUID());
-        try (org.mockito.MockedStatic<ProxyServer> statics = mockStatic(ProxyServer.class)) {
-            statics.when(ProxyServer::getInstance).thenReturn(proxy);
-            RouterService router = new RouterService(health, cfg);
-            assertFalse(router.reserveHub(player,"hub"));
-            assertFalse(router.findBestHub(player).isSuccess());
-            when(hub.canAccess(player)).thenReturn(true);
-            assertTrue(router.reserveHub(player,"hub"));
-        }
+        UUID id = UUID.randomUUID();
+        when(player.getUniqueId()).thenReturn(id);
+        when(proxy.getPlayer(id)).thenReturn(player);
+        RouterService router = new RouterService(health, cfg, new BungeePlatform(proxy));
+        assertFalse(router.reserveHub(id, "hub"));
+        assertFalse(router.findBestHub(id, null).isSuccess());
+        when(hub.canAccess(player)).thenReturn(true);
+        assertTrue(router.reserveHub(id, "hub"));
     }
 
     @Test void aFullHubStillRoutesInitialJoinToFallback() {
@@ -121,9 +120,10 @@ class RoutingRegressionTest {
         RouterService router = mock(RouterService.class);
         PlayerSessionService sessions = mock(PlayerSessionService.class);
         var session = new si.terona.flowgate.model.PlayerSession(id, "tester");
-        when(sessions.getOrCreate(player)).thenReturn(session);
-        when(router.reserveBestHub(player, session)).thenReturn(si.terona.flowgate.model.RoutingResult.failure("full"));
-        when(router.routeToLimbo(player)).thenReturn(si.terona.flowgate.model.RoutingResult.success("limbo"));
+        when(player.getName()).thenReturn("tester");
+        when(sessions.getOrCreate(id, "tester")).thenReturn(session);
+        when(router.reserveBestHub(id, null, session)).thenReturn(si.terona.flowgate.model.RoutingResult.failure("full"));
+        when(router.routeToLimbo(id, null)).thenReturn(si.terona.flowgate.model.RoutingResult.success("limbo"));
         when(plugin.getRouterService()).thenReturn(router); when(plugin.getPlayerSessionService()).thenReturn(sessions);
         when(plugin.getSearchingPlayers()).thenReturn(new HashSet<>());
         ProxyServer proxy = mock(ProxyServer.class); when(plugin.getProxy()).thenReturn(proxy);

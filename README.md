@@ -39,7 +39,7 @@ Once a day FlowGate Lite tells kori.my that one more server runs it: an anonymou
 - **Documentation:** https://kori.my/docs/flowgate-lite/
 - **Download:** [GitHub](https://github.com/darkzmaj/FlowGate-Lite/releases/latest), [Modrinth](https://modrinth.com/plugin/flowgate-lite), [SpigotMC](https://www.spigotmc.org/resources/132152/)
 - **Source code:** https://github.com/darkzmaj/FlowGate-Lite
-- **Support:** https://kori.my
+- **Support:** [Discord](https://kori.my/discord) and https://kori.my
 
 Free to use, with the source code on GitHub. Made by DarkZmaj for KORI Network.
 

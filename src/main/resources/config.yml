@@ -75,3 +75,9 @@ plugin-messages:
 server-names:
   servername1: Hub 1
   servername2: Hub 2
+
+# Anonymous usage statistics: once a day FlowGate Lite tells kori.my that one
+# more server runs it (an anonymous id, the plugin version and the platform).
+# No IP addresses, server names or player data are sent. Set to false to turn it off.
+metrics:
+  enabled: true

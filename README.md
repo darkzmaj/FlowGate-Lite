@@ -151,6 +151,18 @@ slash-servers:
 | `server-weights` | (none) | Per-server balancing weight (higher = more traffic) |
 | `players.hub-max-players` | `100` | Hard routing cap per hub |
 | `players.reserved-slots` | `5` | Slots held back from routing |
+| `metrics.enabled` | `true` | Anonymous daily usage ping to kori.my (see below) |
+
+### Anonymous usage statistics
+
+Once a day FlowGate Lite tells [kori.my](https://kori.my) that one more server runs it. It sends an anonymous id (a one-way hash of a random value kept in `plugins/FlowGate-Lite/.usage-id`), the plugin version, the platform (`bungeecord`) and that it runs on a proxy. No IP addresses, server names or player data are sent or stored. The numbers only count how many servers use the plugin; see the [Privacy Policy](https://kori.my/privacy/). Turn it off with:
+
+```yaml
+metrics:
+  enabled: false
+```
+
+The setting is read before every ping, so `/flowgate reload` applies it.
 
 ---
 

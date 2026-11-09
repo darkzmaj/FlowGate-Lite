@@ -1,3 +1,8 @@
+# 1.0.8 — 2026-11-09
+
+- Anonymous usage statistics: once a day the plugin tells kori.my that one more server runs it (an anonymous id, the version, the platform and that it is a proxy). No IP addresses, server names or player data. Turn it off with `metrics.enabled: false` in `config.yml`; the setting is read before every ping, so a reload applies it. Existing configs without the key count as enabled.
+- The version in the startup log and `/flowgate status` now comes from the plugin itself instead of a hardcoded string.
+
 # 1.0.7 — 2026-10-16
 
 - Fix limbo completion by observing ServerSwitchEvent after the active server changes.

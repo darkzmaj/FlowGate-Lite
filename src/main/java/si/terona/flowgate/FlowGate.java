@@ -26,6 +26,7 @@ import si.terona.flowgate.model.PlayerSession;
 import si.terona.flowgate.model.RoutingResult;
 import si.terona.flowgate.service.HealthMonitorService;
 import si.terona.flowgate.service.MetricsService;
+import si.terona.flowgate.usage.KoriUsageStats;
 import si.terona.flowgate.service.PlayerSessionService;
 import si.terona.flowgate.service.RouterService;
 import si.terona.flowgate.title.TitleManager;
@@ -54,6 +55,7 @@ public final class FlowGate extends Plugin {
 
     // Services
     private MetricsService       metricsService;
+    private KoriUsageStats       usageStats;
     private HealthMonitorService healthMonitorService;
     private RouterService        routerService;
     private PlayerSessionService playerSessionService;
@@ -137,11 +139,21 @@ public final class FlowGate extends Plugin {
         healthMonitorService.start();
         startFallbackScheduler();
 
-        getLogger().info("[FlowGate-Lite] v1.0.7 enabled.");
+        // anonymous daily usage ping to api.kori.my; metrics.enabled: false turns it off (read on every ping)
+        usageStats = new KoriUsageStats("flowgate-lite", getDescription().getVersion(), "bungeecord", "proxy",
+                () -> KoriUsageStats.persistentId("flowgate-lite", getDataFolder().toPath()),
+                () -> config != null && config.getBoolean("metrics.enabled", true));
+        usageStats.start();
+
+        getLogger().info("[FlowGate-Lite] v" + getDescription().getVersion() + " enabled.");
         return true;
     }
 
     private void teardown() {
+        if (usageStats != null) {
+            usageStats.stop();
+            usageStats = null;
+        }
         if (fallbackTask != null) {
             fallbackTask.cancel();
             fallbackTask = null;

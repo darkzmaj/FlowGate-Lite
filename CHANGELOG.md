@@ -1,4 +1,4 @@
-# 1.0.8 — unreleased
+# 1.0.8 — 2026-11-09
 
 An earlier 1.0.8 build without Velocity support was briefly released and then pulled. This 1.0.8 replaces it.
 

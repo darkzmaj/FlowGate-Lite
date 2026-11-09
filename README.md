@@ -1,321 +1,54 @@
-## 1.0.8 — one JAR for BungeeCord and Velocity
+# FlowGate Lite
 
-The same `FlowGate-Lite-1.0.8.jar` loads on **BungeeCord and its forks** (Waterfall, FlameCord and other BungeeCord API forks) and on **Velocity 3.4+ and 4.x**. The plugin is Java 17 bytecode; run it on the Java your proxy needs (Velocity 3.5 needs 21, Velocity 4 needs 25). Nothing is shaded: both proxy families already ship the SnakeYAML used for configuration.
+**Sends every player to the best hub on your BungeeCord or Velocity proxy, and keeps them waiting in limbo instead of kicking them when no hub is free.**
 
-Existing configuration and the backend `BungeeCord` / `Connect` wire format are preserved. Backend servers are trusted infrastructure: firewall them from direct client access, and narrow `plugin-messages.allowed-source-servers` where practical. This plugin forwards connections, never privileged console commands.
-
-Build with JDK 25 (needed to read the Velocity 4 API; Gradle finds an installed JDK 25 through its toolchain support): `bash gradlew clean build`. Output: `build/libs/FlowGate-Lite-1.0.8.jar`. The version is set once, in `build.gradle`. See [CHANGELOG.md](CHANGELOG.md) for changes and validation limits.
-
-# FlowGate-Lite
-
-**FlowGate-Lite** is a production-grade proxy plugin for BungeeCord, Velocity and their forks, for intelligent hub routing, backend health monitoring, automatic failover, and controlled player distribution across Minecraft server networks.
-
-> **FlowGate** is the ecosystem name. **FlowGate-Lite** is this specific plugin. Additional plugins may be released under the FlowGate ecosystem in the future.
-
----
-
-## Overview
-
-FlowGate-Lite replaces the proxy's default server selection logic with a health-aware routing layer. Instead of blindly sending players to whatever server the proxy configuration lists first, it actively monitors backend availability, quarantines failing servers, and selects the best destination based on configurable criteria.
-
-Players who cannot be routed (all hubs offline or full) are held in a configurable limbo server and automatically moved out as soon as a hub becomes available again — no reconnect required.
-
----
+FlowGate Lite checks your hubs all the time and sends each new player to the least busy healthy one. When every hub is down or full, players wait on a limbo server and are moved to a hub by themselves as soon as one is free. It runs only on the proxy, and the same jar works on BungeeCord, Waterfall and Velocity.
 
 ## Features
 
-- **Async health monitoring** – backends are pinged continuously on a dedicated daemon thread
-- **Quarantine system** – servers with repeated failures are isolated and retried after a configurable delay
-- **Least-players routing** – players are sent to the hub with the lowest current load
-- **Weighted balancing** – assign higher weights to servers that should absorb more traffic
-- **Sticky sessions** – returning players are sent back to their last successful hub while it remains healthy
-- **Limbo / fallback system** – players land in a waiting server when all hubs are unavailable
-- **Automatic limbo exit** – scheduler continuously routes limbo players to hubs as they recover
-- **Kick-based fallback** – players kicked from any backend are caught and rerouted automatically
-- **Plugin message security** – backend `BungeeCord` channel messages are validated and rate-limited per-player
-- **Per-server metrics** – routing success/failure, ping failures, quarantine counts tracked in memory
-- **Live status command** – `/flowgate status` shows current health state and metrics
-- **Hot reload** – `/flowgate reload` applies config changes without a full restart
-- **Slash-server commands** – custom `/command → server` mappings
-- **Hub commands** – configurable `/hub`, `/lobby` style commands (max 3)
-- **MOTD management** – selectable MOTD profiles
+- **Health checks.** Pings every hub in the background and skips a hub that stops answering until it is back.
+- **Least busy hub.** New players go to the healthy hub with the fewest players, with optional weights and a player cap.
+- **Limbo.** When no hub is free, players wait on a fallback server with a "Waiting" title and leave by themselves when a hub is ready.
+- **Kick fallback.** A player kicked from a backend goes to another hub or to limbo instead of being disconnected.
+- **Hub and server commands.** `/hub`, `/lobby` and your own commands such as `/survival`.
+- **Backend requests.** Checks `Connect` requests from game servers, for example from FlowGate Bridge, against your allow list.
+- **MOTD.** Server list text and hover lines with `&` codes and hex colours.
+- **Status.** `/flowgate status` shows every server's health and routing counters.
 
----
+## Supported platforms
 
-## Architecture
-
-### Health Monitor
-
-A single-threaded `ScheduledExecutorService` drives the ping cycle using `scheduleWithFixedDelay`. A per-server in-flight guard prevents a slow backend ping from being duplicated; stale callbacks from a reload are ignored.
-
-Ping results update an immutable `ServerHealth` snapshot stored in a `ConcurrentHashMap`. All routing reads from this cache. No routing code performs live pings.
-
-### Quarantine System
-
-When a server accumulates `quarantine-threshold` consecutive ping failures, it is placed in quarantine for `quarantine-duration-ms`. During quarantine it is excluded from all routing. The health monitor automatically re-pings it after the quarantine expires.
-
-### Routing
-
-The `RouterService` selects destinations using:
-
-1. **Sticky session check** (if enabled): if the player has a recent successful server and it is still healthy and has room, route there immediately.
-2. **Weighted least-players selection**: each hub's score is `playerCount / weight`. Lower score = preferred. Hubs at or above the effective cap (`hub-max-players - reserved-slots`) are excluded.
-
-The `PlayerSession` stores per-player state (connection state, retry count, last successful server) using lock-free atomics. State transitions use `compareAndSet` to prevent duplicate routing attempts.
-
-### Limbo Loop
-
-A proxy scheduler task ticks every `check-interval-seconds`. For each player in the limbo set, it:
-
-1. Verifies they are still connected and still on the fallback server.
-2. Checks the retry cooldown.
-3. Atomically transitions session state from `LIMBO` to `ROUTING` via CAS (prevents double-routing).
-4. Calls `RouterService.findBestHub()`.
-5. Connects the player and records the result in the async callback.
-
-### Shutdown
-
-On disable, the plugin cancels the limbo task, shuts down the health monitor executor (with a 3s drain), clears all player sessions, and unregisters listeners and commands. Startup failures trigger the same cleanup path — no partially initialized state survives.
-
----
+- **Velocity:** 3.4 and newer, including 4.x (tested on 3.4.0, 3.5.1, 4.3.1 and 4.3.2).
+- **BungeeCord and Waterfall:** current builds (tested on BungeeCord 2111 and Waterfall 615).
+- **Java:** 17 or newer. Velocity 4 needs Java 25.
+- **On Velocity:** restricted-server checks are BungeeCord-only, and backend `Connect` checks need `bungee-plugin-message-channel = false` in `velocity.toml`.
 
 ## Installation
 
-The same JAR works on both proxy families. Only the config folder differs.
+1. Download `FlowGate-Lite-1.0.8.jar` from one of the links below.
+2. Put it in the proxy's `plugins` folder and restart the proxy.
+3. Put your hub and limbo server names in `config.yml`, then run `/flowgate reload`.
 
-**BungeeCord, Waterfall, FlameCord**
+Full setup: [Install guide](https://kori.my/docs/flowgate-lite/install/).
 
-1. Put `FlowGate-Lite-1.0.8.jar` in the proxy's `plugins/` folder.
-2. Restart the proxy. FlowGate creates `plugins/FlowGate-Lite/config.yml`, `messages.yml` and `motd.yml`.
-3. Set your hub and limbo server names in `config.yml` (names from the proxy's `config.yml`).
-4. Run `/flowgate reload` or restart.
+## Privacy
 
-**Velocity**
+Once a day FlowGate Lite tells kori.my that one more server runs it: an anonymous ID, the plugin version, the platform and that it is a proxy. No IP addresses, server names or player data. Turn it off with `metrics.enabled: false` in `config.yml`. Details: [Privacy Policy](https://kori.my/privacy/).
 
-1. Put `FlowGate-Lite-1.0.8.jar` in the proxy's `plugins/` folder.
-2. Restart the proxy. FlowGate creates `plugins/flowgate-lite/config.yml`, `messages.yml` and `motd.yml`.
-3. Set your hub and limbo server names in `config.yml` (names from `[servers]` in `velocity.toml`).
-4. If backend plugins send `Connect` messages and you want FlowGate's policy on them, set `bungee-plugin-message-channel = false` in `velocity.toml` (see [Velocity notes](#velocity-notes)).
-5. Restart the proxy (Velocity has no plugin reload; `/flowgate reload` reloads FlowGate's own config).
+## Links
 
-**Requirements:**
-- Java 17 or newer, or what your proxy needs (Velocity 3.5 needs 21, Velocity 4 needs 25)
-- BungeeCord (or a fork such as Waterfall/FlameCord), or Velocity 3.4+ / 4.x
+- **Documentation:** https://kori.my/docs/flowgate-lite/
+- **Download:** [GitHub](https://github.com/darkzmaj/FlowGate-Lite/releases/latest), [Modrinth](https://modrinth.com/plugin/flowgate-lite), [SpigotMC](https://www.spigotmc.org/resources/132152/)
+- **Source code:** https://github.com/darkzmaj/FlowGate-Lite
+- **Support:** https://kori.my
 
----
+Free to use, with the source code on GitHub. Made by DarkZmaj for KORI Network.
 
-## Configuration
+## For developers
 
-### `config.yml`
-
-```yaml
-debug:
-  enabled: false
-
-titles:
-  enabled: true
-
-hubs:
-  - hub-1
-  - hub-2
-
-hub-commands:
-  - hub
-
-routing:
-  enabled: true
-  retry-cooldown-ms: 5000
-  quarantine-threshold: 3
-  quarantine-duration-ms: 60000
-  sticky-sessions: false
-  sticky-session-ttl-ms: 300000
-
-fallback:
-  enabled: true
-  fallback-server: limbo
-
-players:
-  hub-max-players: 100
-  reserved-slots: 5
-
-check-interval-seconds: 10
-
-server-weights:
-  hub-1: 1
-  hub-2: 2
-
-slash-servers:
-  anarchy: anarchy-server
-```
-
-### Key settings
-
-| Key | Default | Description |
-|-----|---------|-------------|
-| `hubs` | — | Hub server name list |
-| `fallback.fallback-server` | `limbo-wait` | Holding server when all hubs are offline |
-| `check-interval-seconds` | `10` | Ping and limbo check frequency |
-| `routing.quarantine-threshold` | `3` | Consecutive failures before quarantine |
-| `routing.quarantine-duration-ms` | `60000` | Quarantine window (ms) |
-| `routing.sticky-sessions` | `false` | Prefer last known hub for returning players |
-| `routing.sticky-session-ttl-ms` | `300000` | Sticky session validity period (ms) |
-| `server-weights` | (none) | Per-server balancing weight (higher = more traffic) |
-| `players.hub-max-players` | `100` | Hard routing cap per hub |
-| `players.reserved-slots` | `5` | Slots held back from routing |
-| `metrics.enabled` | `true` | Anonymous daily usage ping to kori.my (see below) |
-
-### Anonymous usage statistics
-
-Once a day FlowGate Lite tells [kori.my](https://kori.my) that one more server runs it. It sends an anonymous id (a one-way hash of a random value kept in `.usage-id` in the plugin's config folder), the plugin version, the platform (`bungeecord` or `velocity`) and that it runs on a proxy. The first ping goes out 5 minutes after start, then once a day; it stops when the proxy shuts down. No IP addresses, server names or player data are sent or stored. The numbers only count how many servers use the plugin; see the [Privacy Policy](https://kori.my/privacy/). Turn it off with:
-
-```yaml
-metrics:
-  enabled: false
-```
-
-The setting is read before every ping, so `/flowgate reload` applies it.
-
----
-
-## Commands
-
-| Command | Permission | Description |
-|---------|-----------|-------------|
-| `/flowgate reload` | `flowgate.command.reload` | Reloads configs and restarts services |
-| `/flowgate status` | `flowgate.command.status` or `flowgate.command.reload` | Shows backend health and metrics |
-| `/hub` (configurable) | — | Sends player to best available hub |
-| `/<slash-server>` | — | Sends player to a specific named server |
-
-The same commands and permissions work on Velocity. On both proxies the console has every permission; give players permissions with your permissions plugin (for example LuckPerms).
-
----
-
-## Routing Behavior
-
-**On join:** The plugin picks the first server (`JOIN_PROXY` on BungeeCord, `PlayerChooseInitialServerEvent` on Velocity). If any hub is healthy, the player is routed to the best hub. If no hubs are available, they land in the fallback server and are marked as searching.
-
-**On kick:** The plugin intercepts server kicks and reroutes the player. First tries other healthy hubs (excluding the failed server). If none available, routes to limbo.
-
-**In limbo:** Players in the limbo server are re-evaluated every `check-interval-seconds`. As soon as a hub becomes available, they are routed out automatically — no reconnect required.
-
----
-
-## Sticky Sessions
-
-When `routing.sticky-sessions: true`, the router remembers the last hub a player successfully connected to during the current proxy session. On a later routing decision in that session, if that hub is still healthy and has capacity, it is selected directly. The session expires after `sticky-session-ttl-ms` milliseconds.
-
-Useful for networks where game state is hub-local and players should return to the same hub after a reroute.
-
-Sticky assignments are intentionally not persisted across proxy reconnects. This keeps FlowGate-Lite stateless and avoids a storage dependency.
-
----
-
-## Backend Plugin Messages
-
-Backend `BungeeCord:Connect` messages may target configured hubs and the fallback server by default. To allow other destinations or restrict which backend servers may issue them, configure `plugin-messages.allowed-connect-servers` and `plugin-messages.allowed-source-servers`.
-
-**Velocity:** see [Velocity notes](#velocity-notes).
-
----
-
-## Velocity notes
-
-- **Backend `Connect` messages.** Velocity answers `BungeeCord`-channel messages itself while `bungee-plugin-message-channel = true` in `velocity.toml` (the default). Then FlowGate never sees them, so its destination, source, rate and hub-capacity checks do not apply; FlowGate logs a note at startup. Set it to `false` to have FlowGate handle backend `Connect` messages with that policy.
-- **Other BungeeCord subchannels.** FlowGate implements only `Connect`. With Velocity's handler off, other subchannels (`PlayerCount`, `GetServers`, `Forward`, `ConnectOther` and so on) are dropped. Keep Velocity's handler on if backend plugins need them.
-- **Restricted servers.** Velocity has no `restricted` flag, so restricted-access checks apply on BungeeCord only.
-- **Client messages.** Client-sent `BungeeCord` channel messages are always dropped.
-- **Config folder.** `plugins/flowgate-lite/` (Velocity names it after the plugin id). Copy your BungeeCord config files there when you move a network.
-- **Failed switches.** When a connect to another server fails, the player stays where they are, as Velocity does by default. Kicks while already on a server still use FlowGate's fallback.
-
----
-
-## Weighted Balancing
-
-```yaml
-server-weights:
-  hub-1: 1
-  hub-2: 3   # 3x more likely to receive players vs hub-1
-```
-
-The router computes a score of `playerCount / weight`. A server with weight 3 will handle up to 3x more players than a weight-1 server before its score exceeds the weight-1 server's score. Weighted balancing combines with the player limit — a full hub is never selected regardless of weight.
-
----
-
-## Troubleshooting
-
-**Players get kicked instead of being rerouted**
-: Check that `fallback.fallback-server` matches a server name registered in the proxy. Ensure the fallback server is running.
-
-**Hubs are quarantined frequently**
-: Increase `quarantine-threshold` if backends are slow to respond. Check network latency between proxy and backends. A threshold of 5 is reasonable for high-latency links.
-
-**Sticky sessions not working**
-: The player must have previously connected to a hub successfully during the current proxy session. Check that `routing.sticky-sessions: true` and the TTL is long enough.
-
-**`/flowgate reload` fails**
-: Check the proxy console for specific config parse errors. The plugin stays on the previous valid config until reload succeeds.
-
----
-
-## Production Recommendations
-
-- Set `check-interval-seconds` to `5`–`10`. Lower values improve responsiveness but increase ping load.
-- Set `quarantine-duration-ms` longer than your average backend restart time (60–120 seconds).
-- Use `reserved-slots` to maintain operator access headroom during full load.
-- Enable `sticky-sessions` only if your game design benefits from player-hub affinity.
-- Run the limbo server on a minimal server implementation (e.g., NanoLimbo) to reduce overhead.
-- Avoid setting `hub-max-players` higher than the actual server can handle — let the proxy's own limits act as a secondary backstop.
-
----
-
-## Compatibility
-
-| Platform | Status |
-|----------|--------|
-| Velocity 4.x | Player-tested on 4.3.1 build 45 and 4.3.2-SNAPSHOT build 48 (Java 25) |
-| Velocity 3.5 | Player-tested on 3.5.1 build 615 (Java 21) |
-| Velocity 3.4 | Player-tested on 3.4.0 build 566 (Java 17) |
-| BungeeCord | Player-tested on build 2111 (Java 21) |
-| Waterfall | Player-tested on build 615 (Java 21); upstream is discontinued |
-| FlameCord and other BungeeCord API forks | Expected to work (same API and `bungee.yml`); not tested |
-| Velocity forks that keep the Velocity plugin API | Expected to work; not tested |
-| Velocity older than 3.4 | Not supported |
-
-Each proxy was tested with two offline-mode bot players (Minecraft 1.21.11) and three Paper 1.21.11 backends (two hubs, one limbo): balanced joins, kick fallback to the other hub, `/hub`, a slash-server command into limbo with waiting titles and automatic exit, allowed and blocked backend `Connect` messages (Velocity with `bungee-plugin-message-channel = false`), a hub outage sending kicked players to limbo and back, `/flowgate status`, `/flowgate reload` (a slash command added by the reload works), MOTD with hex colour and hover, the usage ping (platform `velocity` or `bungeecord`) and clean shutdown. High player counts and online mode were not tested.
-
-**Java:** 17+ bytecode; the proxy decides the runtime.
-
-----------|--------|
-| BungeeCord | ✓ Player-tested on build 2111 |
-| Waterfall | ✓ Player-tested on build 615; upstream is discontinued |
-| FlameCord and other BungeeCord API forks | ✓ Expected (same API and `bungee.yml` loading); not individually tested |
-| Velocity 4.x | ✓ Player-tested on 4.3.1 build 45 (Java 25) |
-| Velocity 3.4+ | ✓ Player-tested on 3.4.0 build 566 (Java 17) |
-| Velocity forks keeping the Velocity plugin API | ✓ Expected; not individually tested |
-
-Each proxy was tested with two offline-mode bot players (Minecraft 1.21.11) and three Paper 1.21.11 backends (two hubs, one limbo): balanced initial joins, kick fallback to the other hub, `/hub`, a slash-server command into limbo with waiting titles and automatic exit, allowed and blocked backend `Connect` messages (Velocity with `bungee-plugin-message-channel = false`), a hub outage sending kicked players to limbo and back once a hub is free, `/flowgate status`, plus enable, health pings, `reload`, MOTD/hover and clean shutdown. High player counts were not load-tested.
-
-**Java:** 17+ bytecode; the proxy decides the runtime (Velocity 4 needs 25).
-
----
-
-## Project Naming
-
-| Name | Role |
-|------|------|
-| **FlowGate** | Ecosystem name. Used in package paths and branding. |
-| **FlowGate-Lite** | This plugin. Lightweight proxy routing for BungeeCord and Velocity networks. |
-
-Future plugins under the FlowGate ecosystem may include advanced cross-proxy coordination or metrics exporters.
-
----
-
-© Terona Studios. All rights reserved.
-
-## Release downloads and publishing
-
-Install the compiled **FlowGate-Lite-<version>.jar** from [GitHub Releases](https://github.com/darkzmaj/FlowGate-Lite/releases); the generated source archives are not installable plugins. Release assets include a SHA-256 file.
+Build with JDK 25 (needed to read the Velocity 4 API; Gradle finds an installed JDK 25 through its toolchain support): `bash gradlew clean build`. Output: `build/libs/FlowGate-Lite-<version>.jar`. The version is set once, in `build.gradle`. See [CHANGELOG.md](CHANGELOG.md) for changes and validation limits, and the release notes in [docs/releases](docs/releases/).
 
 The **Publish release JAR** workflow runs for new `vMAJOR.MINOR.PATCH` tags. To attach assets to an existing release, run it manually from `main` with the exact version tag (for example `v1.0.7`). It checks out the resolved tag commit, uses Java 25, runs `clean build` and existing tests, validates plugin metadata and bytecode, and preserves the JAR as an Actions artifact before publishing. The build has read-only repository access; only the separate publishing job has `contents: write`. Existing assets are compared and never overwritten. The audited release tag and original JAR checksum are pinned for v1.0.7; a mismatch stops publication.
 
 Repository Actions must be enabled and permit the workflow's `GITHUB_TOKEN` to request `contents: write` (organization policy must permit it). No personal access token is required. No tag or release needs to be deleted or recreated. See the release notes ([1.0.8](docs/releases/v1.0.8.md), [1.0.7](docs/releases/v1.0.7.md)) for verified platforms and limitations.
+
+© Terona Studios. All rights reserved.

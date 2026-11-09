@@ -2,7 +2,7 @@ plugins {
     id 'java'
 }
 
-group = 'si.terona'
+group = 'dev.korinetwork'
 version = '1.0.8'
 
 // Velocity 4 API classes are Java 25 bytecode, so compile with JDK 25 while still

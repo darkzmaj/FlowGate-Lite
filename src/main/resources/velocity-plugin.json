@@ -4,7 +4,7 @@
   "version": "${version}",
   "description": "Hub load balancing, health-checked routing and limbo fallback for proxies.",
   "url": "https://github.com/darkzmaj/FlowGate-Lite",
-  "authors": ["Terona Studios"],
+  "authors": ["DarkZmaj"],
   "dependencies": [],
-  "main": "si.terona.flowgate.velocity.FlowGateVelocity"
+  "main": "dev.korinetwork.flowgate.velocity.FlowGateVelocity"
 }

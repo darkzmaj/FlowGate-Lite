@@ -1,0 +1,60 @@
+package dev.korinetwork.flowgate.listener;
+
+import net.md_5.bungee.api.connection.ProxiedPlayer;
+import net.md_5.bungee.api.event.ServerSwitchEvent;
+import net.md_5.bungee.api.event.PlayerDisconnectEvent;
+import net.md_5.bungee.api.plugin.Listener;
+import net.md_5.bungee.event.EventHandler;
+import dev.korinetwork.flowgate.FlowGate;
+import dev.korinetwork.flowgate.model.ConnectionState;
+import dev.korinetwork.flowgate.model.PlayerSession;
+import dev.korinetwork.flowgate.title.TitleManager;
+
+import java.util.UUID;
+
+public final class LimboRouterListener implements Listener {
+
+    private final FlowGate plugin;
+
+    public LimboRouterListener(FlowGate plugin) {
+        this.plugin = plugin;
+    }
+
+    @EventHandler
+    public void onServerConnected(ServerSwitchEvent event) {
+        ProxiedPlayer player = event.getPlayer();
+        if (player == null || plugin.isShuttingDown()) return;
+        plugin.getRouterService().releaseReservation(player.getUniqueId());
+        if (!plugin.isOnFallback(player)) {
+            plugin.getSearchingPlayers().remove(player.getUniqueId());
+            plugin.getPlayerSessionService().markConnected(player.getUniqueId(), player.getServer().getInfo().getName());
+            TitleManager.clear(player);
+            return;
+        }
+
+        UUID uuid = player.getUniqueId();
+        if (!plugin.getSearchingPlayers().add(uuid)) return;
+
+        PlayerSession session = plugin.getPlayerSessionService().getOrCreate(uuid, player.getName());
+        session.setState(ConnectionState.LIMBO);
+
+        if (plugin.getPluginConfig().isTitlesEnabled()) TitleManager.start(player);
+
+        plugin.sendFallbackSearching(player);
+        plugin.getMetricsService().recordReconnect();
+        plugin.debug(player.getName() + " entered limbo.");
+    }
+
+    @EventHandler
+    public void onPlayerDisconnect(PlayerDisconnectEvent event) {
+        ProxiedPlayer player = event.getPlayer();
+        if (player == null || plugin.isShuttingDown()) return;
+
+        UUID uuid = player.getUniqueId();
+        plugin.getSearchingPlayers().remove(uuid);
+        plugin.getRouterService().releaseReservation(uuid);
+        plugin.clearPluginMessageRateLimit(uuid);
+        plugin.getPlayerSessionService().remove(uuid);
+        TitleManager.clear(player);
+    }
+}

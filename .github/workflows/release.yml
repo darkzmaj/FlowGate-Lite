@@ -103,14 +103,14 @@ jobs:
                   if actual != version:
                       raise SystemExit(f'Incorrect version in {descriptor}: {actual}')
               classes = [p for p in entries if p.endswith('.class') and not p.startswith('META-INF/versions/')]
-              if not any(p.startswith('si/terona/') for p in classes):
+              if not any(p.startswith('dev/korinetwork/') for p in classes):
                   raise SystemExit('Not a compiled plugin JAR')
               for entry in classes:
                   header = archive.read(entry)[:8]
                   if header[:4] != b'\xca\xfe\xba\xbe' or struct.unpack('>H', header[6:8])[0] > 61:
                       raise SystemExit(f'Unexpected bytecode: {entry}')
               if 'FlowGate-Lite' == 'NullBrand':
-                  required = ['si/terona/nullbrand/internal/yaml/Yaml.class', 'META-INF/LICENSE-SnakeYAML.txt']
+                  required = ['dev/korinetwork/nullbrand/internal/yaml/Yaml.class', 'META-INF/LICENSE-SnakeYAML.txt']
                   if not all(p in entries for p in required):
                       raise SystemExit('Missing shaded parser or license; do not publish the plain JAR')
           digest = hashlib.sha256(jar.read_bytes()).hexdigest()

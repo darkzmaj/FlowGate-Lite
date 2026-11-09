@@ -1,4 +1,4 @@
 name: FlowGate-Lite
 version: ${version}
-main: si.terona.flowgate.FlowGate
-author: Terona Studios
+main: dev.korinetwork.flowgate.FlowGate
+author: DarkZmaj
